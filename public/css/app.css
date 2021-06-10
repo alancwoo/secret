@@ -31831,6 +31831,39 @@ video {
   --tw-backdrop-sepia: sepia(100%);
 }
 
+body, html {
+  --tw-text-opacity: 1;
+  color: rgba(55, 65, 81, var(--tw-text-opacity));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+.pulse {
+  -webkit-animation: pulse 3s infinite;
+          animation: pulse 3s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1
+  }
+
+  50% {
+    opacity: 0.3
+  }
+
+  100% {
+    opacity: 1
+  }
+}
+
+.select-color::-moz-selection {
+  background: yellow;
+}
+
+.select-color::selection {
+  background: yellow;
+}
+
 @media (min-width: 640px) {
   .sm\:container {
     width: 100%;

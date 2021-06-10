@@ -6,3 +6,4 @@ Homestead.yaml
 .phpunit.result.cache
 /database/database.sqlite
 node_modules
+public

@@ -14,18 +14,22 @@
 */
 
 $router->get('/', function () use ($router) {
-    return $router->app->version();
+    return view('home');
 });
 
 // $router->get('/secret/new', function () {
 //     return view('newsecret');
 // });
 
-// $router->get('/secret/{id}', function ($id) use ($router) {
-//     return "Bob";
-// });
+$router->get('new', ['as' => 'secret.new', function () {
+    return view('secret-new');
+}]);
 
-$router->group(['prefix' => 'secret'], function () use ($router) {
-    $router->get('{id}/{key}', ['uses' => 'SecretController@showSecret']);
-    $router->post('', ['uses' => 'SecretController@create']);
-});
+$router->post('secret', [
+    'uses' => 'SecretController@create'
+]);
+
+$router->get('{id}/{key}', [
+    'as' => 'secret',
+    'uses' => 'SecretController@showSecret'
+]);
