@@ -10,8 +10,7 @@ use DateInterval;
 
 class SecretController extends Controller
 {
-  public function showSecret($id, $key)
-  {
+  private function decryptSecret($id, $key) {
     $secret = Secret::findOrFail($id);
 
     $key = hex2bin($key);
@@ -23,9 +22,19 @@ class SecretController extends Controller
     $ciphertext = substr($encrypted, $iv_len, -$tag_length);
     $tag = substr($encrypted, -$tag_length);
 
-    $message = openssl_decrypt($ciphertext, $cipher, $key, OPENSSL_RAW_DATA, $iv, $tag);
+    return openssl_decrypt($ciphertext, $cipher, $key, OPENSSL_RAW_DATA, $iv, $tag);
+  }
+
+  private function deleteSecret($id) {
+    Secret::findOrFail($id)->delete();
+  }
+
+  public function showSecret($id, $key)
+  {
+    $message = $this->decryptSecret($id, $key);
 
     if ($message) {
+      $this->deleteSecret($id);
       return view('secret-view', ['message' => $message]);
     } else {
       return response(view("errors.404"), 404);
@@ -83,25 +92,11 @@ class SecretController extends Controller
         'error' => "Password Incorrect"
       ], 401);
     }
-
-
-
-    // Store in database
-    // $secret = Secret::create($request->all());
-    // return response()->json($secret, 201);
   }
 
-  // public function update($id, Request $request)
-  // {
-  //   $author = Author::findOrFail($id);
-  //   $author->update($request->all());
-
-  //   return response()->json($author, 200);
-  // }
-
-  // public function delete($id)
-  // {
-  //   Author::findOrFail($id)->delete();
-  //   return response('Deleted Successfully', 200);
-  // }
+  public function delete($id)
+  {
+    Secret::findOrFail($id)->delete();
+    return response('Deleted Successfully', 200);
+  }
 }

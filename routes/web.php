@@ -13,15 +13,8 @@
 |
 */
 
-$router->get('/', function () use ($router) {
-    return view('home');
-});
 
-// $router->get('/secret/new', function () {
-//     return view('newsecret');
-// });
-
-$router->get('new', ['as' => 'secret.new', function () {
+$router->get('/', ['as' => 'secret.new', function () {
     return view('secret-new');
 }]);
 
@@ -33,3 +26,7 @@ $router->get('{id}/{key}', [
     'as' => 'secret',
     'uses' => 'SecretController@showSecret'
 ]);
+
+$router->get('{id}', function () {
+    return view('secret-no-key');
+});
