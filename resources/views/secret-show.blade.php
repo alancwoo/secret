@@ -42,6 +42,8 @@
 
       async decryptMessage() {
         try {
+          console.log(str2ab(this.iv))
+          console.log(str2ab(this.content))
           const decryptionKey = await window.crypto.subtle.importKey(
             "jwk",
             {
