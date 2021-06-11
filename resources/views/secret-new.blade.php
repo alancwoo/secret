@@ -4,7 +4,7 @@
 <div x-data="secret()">
   <h1 class="font-bold mb-3">Secret</h1>
   <form @submit.prevent="newSecret()" action="/secret" class="flex flex-col space-y-6">
-    <textarea x-model="secret" x-bind:disabled="submitting" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 h-48" x-bind:class="{ 'text-gray-300 bg-gray-500': submitting }" placeholder="Enter your secret..." autofocus required></textarea>
+    <textarea x-model="message" x-bind:disabled="submitting" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 h-48" x-bind:class="{ 'text-gray-300 bg-gray-500': submitting }" placeholder="Enter your secret..." autofocus required></textarea>
     <div x-show="!submitting">
       <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-6">
         <div class="w-full">
@@ -73,6 +73,7 @@
 
 @section('footer')
 <script>
+
   function ab2str(buf) {
     return String.fromCharCode.apply(null, new Uint16Array(buf));
   } 
@@ -80,7 +81,7 @@
   function secret() {
     return {
       submitting: false,
-      secret: null,
+      message: null,
       expires: '5M',
       password: null,
       error: null,
@@ -125,6 +126,14 @@
         return `${this.url}#${this.key}`
       },
 
+      get messagePadded() {
+        if (this.message.length % 2) {
+          return this.message + '\n'
+        } else {
+          return this.message
+        }
+      },
+
       async generateKey() {
         return window.crypto.subtle.generateKey(
           {
@@ -135,37 +144,47 @@
           ["encrypt", "decrypt"]
         )
       },
-
-      async encryptSecret() {
-        const key = await this.generateKey()
-        this.iv = window.crypto.getRandomValues(new Uint8Array(12))
-        this.key = (await window.crypto.subtle.exportKey('jwk', key)).k
-
-        return window.crypto.subtle.encrypt(
-          {
-            name: "AES-GCM",
-            iv: this.iv
-          },
-          key,
-          new TextEncoder().encode(this.secret),
-        )
-      },
       
       async newSecret() {
         this.submitting = true
 
         try {
-          const payload = await this.encryptSecret()
+          const encoder = new TextEncoder()
+          const messageUTF8 = encoder.encode(this.messagePadded)
+
+          const iv = window.crypto.getRandomValues(new Uint8Array(12));
+          const algorithm = {
+            iv,
+            name: 'AES-GCM',
+          }
+
+          const key = await window.crypto.subtle.generateKey({
+              name: 'AES-GCM',
+              length: 256
+            },
+            true, [
+              'encrypt',
+              'decrypt'
+            ]
+          )
+
+          const messageEncryptedUTF8 = await window.crypto.subtle.encrypt(
+            algorithm,
+            key,
+            messageUTF8,
+          )
+
+          this.key = (await window.crypto.subtle.exportKey("jwk", key)).k
 
           const response = await fetch('/secret', {
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
             body: JSON.stringify({
-              iv: ab2str(this.iv),
-              content: ab2str(payload),
+              password: this.password,
               expires: this.expires,
-              password: this.password
+              content: ab2str(messageEncryptedUTF8),
+              iv: ab2str(iv.buffer)
             })
           })
 
@@ -188,6 +207,7 @@
           }
 
         } catch(e) {
+          console.error(e)
           this.error = e
         }
       }

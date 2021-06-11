@@ -20,17 +20,18 @@ class SecretController extends Controller
     $secret = Secret::findOrFail($id);
     return view('secret-show', [
       'id' => $secret->id,
-      'iv' => $secret->iv,
-      'content' => $secret->content
+      'content' => $secret->content,
+      'iv' => $secret->iv
     ]);
   }
 
   public function create(Request $request)
   {
     $data = $request->json()->all();
+    $pass = $data['password'];
 
     // Check password
-    if ($data['password'] == env('NEW_ITEM_PASSWORD')) {
+    if ($pass === env('NEW_ITEM_PASSWORD')) {
 
       // Set expiry
       $now = new \DateTime();
@@ -39,8 +40,8 @@ class SecretController extends Controller
       // Create and store secret
       $secret = new Secret;
       $secret->content = $data['content'];
-      $secret->expires = $expiry;
       $secret->iv = $data['iv'];
+      $secret->expires = $expiry;
       $secret->save();
 
       return response()->json([

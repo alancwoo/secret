@@ -14,10 +14,12 @@
   "license": "ISC",
   "devDependencies": {
     "alpinejs": "^2.8.2",
+    "base64-arraybuffer": "^0.2.0",
     "browser-sync": "^2.26.14",
     "browser-sync-webpack-plugin": "^2.3.0",
     "laravel-mix": "^6.0.19",
     "postcss": "^8.3.0",
     "tailwindcss": "^2.1.4"
-  }
+  },
+  "dependencies": {}
 }

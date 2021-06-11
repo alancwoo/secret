@@ -4,7 +4,7 @@
 <div x-data="secret()" x-init="mounted">
   <template x-if="message">
     <div>
-      <div class="select-color w-full bg-gray-200 rounded p-4" x-text="iv"></div>
+      <div class="select-color w-full bg-gray-200 rounded p-4" x-text="message"></div>
       <div class="select-none text-red-500 text-sm italic leading-tight mt-3">This message has already been deleted from the server and cannot be viewed again. Please save securely.</div>
     </div>
   </template>
@@ -23,7 +23,7 @@
       bufView[i] = str.charCodeAt(i)
     }
     return buf
-  }
+  }  
 
   function secret() {
     return {
@@ -31,8 +31,6 @@
       id: @json($id),
       message: null,
       error: null,
-      iv: "{{ $iv }}",
-      content: "{{ $content }}",
 
       async mounted() {
         if (this.key) {
@@ -42,8 +40,9 @@
 
       async decryptMessage() {
         try {
-          console.log(str2ab(this.iv))
-          console.log(str2ab(this.content))
+          const content = "{{ $content }}"
+          const ivStr = "{{ $iv }}"
+
           const decryptionKey = await window.crypto.subtle.importKey(
             "jwk",
             {
@@ -56,17 +55,23 @@
             { name: "AES-GCM", length: 256 },
             false, // extractable
             ["decrypt"],
-          );
-
-          const decrypted = await window.crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: str2ab(this.iv) },
-            decryptionKey,
-            str2ab(this.content)
           )
 
-          const decoded = new window.TextDecoder().decode(new Uint8Array(decrypted));
+          const decrypted = await window.crypto.subtle.decrypt(
+            {
+              name: "AES-GCM",
+              iv: str2ab(ivStr)
+            },
+            decryptionKey,
+            str2ab(content)
+          )
+
+          const decoded = new window.TextDecoder().decode(new Uint8Array(decrypted))
+
+          this.message = decoded
 
         } catch(e) {
+          console.error(e)
           this.error = e
         }
       }
