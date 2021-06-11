@@ -18,6 +18,7 @@
     "browser-sync": "^2.26.14",
     "browser-sync-webpack-plugin": "^2.3.0",
     "laravel-mix": "^6.0.19",
+    "laravel-mix-purgecss": "^6.0.0",
     "postcss": "^8.3.0",
     "tailwindcss": "^2.1.4"
   },
