@@ -19,41 +19,28 @@ class SecretController extends Controller
   {
     $secret = Secret::findOrFail($id);
     return view('secret-show', [
-      'id' => $secret->id
+      'id' => $secret->id,
+      'iv' => $secret->iv,
+      'content' => $secret->content
     ]);
-  }
-
-  public function blob($id)
-  {
-    $secret = Secret::findOrFail($id);
-    return $secret->content;
-  }
-
-  public function iv($id)
-  {
-    $secret = Secret::findOrFail($id);
-    return $secret->iv;
   }
 
   public function create(Request $request)
   {
-    // $data = $request->all();
-    $json = json_decode($request->json_data);
-    $content = $request->content;
-    $iv = $request->iv;
+    $data = $request->json()->all();
 
     // Check password
-    if ($json->password == env('NEW_ITEM_PASSWORD')) {
+    if ($data['password'] == env('NEW_ITEM_PASSWORD')) {
 
       // Set expiry
       $now = new \DateTime();
-      $expiry = $now->add(new \DateInterval("P{$json->expires}"));
+      $expiry = $now->add(new \DateInterval("P{$data['expires']}"));
 
       // Create and store secret
       $secret = new Secret;
-      $secret->content = $content;
+      $secret->content = $data['content'];
       $secret->expires = $expiry;
-      $secret->iv = $iv;
+      $secret->iv = $data['iv'];
       $secret->save();
 
       return response()->json([

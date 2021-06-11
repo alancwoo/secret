@@ -14,24 +14,15 @@
 */
 
 
-$router->get('/', ['as' => 'secret.new', function () {
+$router->get('/', function () {
     return view('secret-new');
-}]);
+});
 
 $router->post('secret', [
     'uses' => 'SecretController@create'
 ]);
 
-$router->get('{id}/blob', [
-    'uses' => 'SecretController@blob'
-]);
-
-$router->get('{id}/iv', [
-    'uses' => 'SecretController@iv'
-]);
-
 $router->get('{id}', [
-    'as' => 'secret',
     'uses' => 'SecretController@show'
 ]);
 

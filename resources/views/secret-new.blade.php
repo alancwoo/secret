@@ -73,6 +73,10 @@
 
 @section('footer')
 <script>
+  function ab2str(buf) {
+    return String.fromCharCode.apply(null, new Uint16Array(buf));
+  } 
+
   function secret() {
     return {
       submitting: false,
@@ -143,7 +147,7 @@
             iv: this.iv
           },
           key,
-          new TextEncoder().encode(JSON.stringify(this.secret)),
+          new TextEncoder().encode(this.secret),
         )
       },
       
@@ -153,20 +157,16 @@
         try {
           const payload = await this.encryptSecret()
 
-          const fd = new FormData()
-          fd.append('json_data', JSON.stringify({
-            expires: this.expires,
-            password: this.password
-          }))
-          fd.append('iv', this.iv)
-          fd.append('content', payload)
-
-
           const response = await fetch('/secret', {
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
-            body: fd
+            body: JSON.stringify({
+              iv: ab2str(this.iv),
+              content: ab2str(payload),
+              expires: this.expires,
+              password: this.password
+            })
           })
 
           if (response.status == 201) {

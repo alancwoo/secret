@@ -16,25 +16,27 @@
 
 @section('footer')
 <script>
+  function str2ab(str) {
+    var buf = new ArrayBuffer(str.length*2)
+    var bufView = new Uint16Array(buf)
+    for (var i=0, strLen=str.length; i < strLen; i++) {
+      bufView[i] = str.charCodeAt(i)
+    }
+    return buf
+  }
+
   function secret() {
     return {
       key: window.location.hash.substring(1),
       id: @json($id),
       message: null,
       error: null,
-      iv: null,
-      content: null,
+      iv: "{{ $iv }}",
+      content: "{{ $content }}",
 
       async mounted() {
         if (this.key) {
-          fetch(window.location.origin + window.location.pathname + '/blob').then(async (data) => {
-            this.content = await data.arrayBuffer()
-
-            fetch(window.location.origin + window.location.pathname + '/iv').then(async (data) => {
-              this.iv = await data.arrayBuffer()
-              this.decryptMessage()
-            })
-          })
+          this.decryptMessage()
         }
       },
 
@@ -53,13 +55,11 @@
             false, // extractable
             ["decrypt"],
           );
-          console.log(this.content)
-          console.log(this.iv)
 
           const decrypted = await window.crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: this.iv },
+            { name: "AES-GCM", iv: str2ab(this.iv) },
             decryptionKey,
-            this.content
+            str2ab(this.content)
           )
 
           const decoded = new window.TextDecoder().decode(new Uint8Array(decrypted));
@@ -72,6 +72,6 @@
   }
 
   window.onbeforeunload = function() {
-    return true;
+    return true
   }
 </script>
