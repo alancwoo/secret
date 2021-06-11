@@ -16,9 +16,9 @@ class CreateSecretsTable extends Migration
         Schema::create('secrets', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->timestamps();
-            $table->string('cipher');
-            $table->string('content');
+            $table->binary('content');
             $table->date('expires');
+            $table->binary('iv');
         });
     }
 

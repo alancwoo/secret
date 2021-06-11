@@ -22,11 +22,16 @@ $router->post('secret', [
     'uses' => 'SecretController@create'
 ]);
 
-$router->get('{id}/{key}', [
-    'as' => 'secret',
-    'uses' => 'SecretController@showSecret'
+$router->get('{id}/blob', [
+    'uses' => 'SecretController@blob'
 ]);
 
-$router->get('{id}', function () {
-    return view('secret-no-key');
-});
+$router->get('{id}/iv', [
+    'uses' => 'SecretController@iv'
+]);
+
+$router->get('{id}', [
+    'as' => 'secret',
+    'uses' => 'SecretController@show'
+]);
+

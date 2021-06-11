@@ -15,7 +15,7 @@ class Secret extends Model
    * @var array
    */
   protected $fillable = [
-    'content', 'expires'
+    'content', 'expires', 'iv'
   ];
 
   /**

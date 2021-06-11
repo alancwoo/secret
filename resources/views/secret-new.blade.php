@@ -2,11 +2,11 @@
 
 @section('content')
 <div x-data="secret()">
-  <h1 class="font-bold mb-3">New Secret</h1>
+  <h1 class="font-bold mb-3">Secret</h1>
   <form @submit.prevent="newSecret()" action="/secret" class="flex flex-col space-y-6">
     <textarea x-model="secret" x-bind:disabled="submitting" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 h-48" x-bind:class="{ 'text-gray-300 bg-gray-500': submitting }" placeholder="Enter your secret..." autofocus required></textarea>
     <div x-show="!submitting">
-      <div class="flex space-x-6">
+      <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-6">
         <div class="w-full">
           <label class="block uppercase tracking-wide text-xs font-bold mb-2" for="expires">Expires</label>
           <div class="relative mb-2">
@@ -41,26 +41,26 @@
 
   <template x-if="data">
     <div class="mt-6">
-      <h1 class="text-green-400">Your secret has been encrypted and saved securely. Please share the link below.</h1>
+      <h1 class="text-green-400 select-none">Your secret has been encrypted and saved securely. Please share the link below.</h1>
       <div class="border rounded border-gray-400 p-4 mt-3 bg-gray-200">
-        <span class="break-all select-color" x-text="data.url_full" />
+        <span class="break-all select-color" x-text="fullUrl" />
       </div>
 
       <div class="mt-6">
-        <p class="text-green-400">For increased security you may choose to send the URL and KEY separately:</p>
+        <p class="text-green-400 select-none">For increased security you may choose to send the URL and KEY separately (e.g. one by email and another by text)</p>
 
-        <h3 class="mt-3 block uppercase tracking-wide text-xs font-bold mb-2">URL</h3>
+        <h3 class="select-none mt-3 block uppercase tracking-wide text-xs font-bold mb-2">URL</h3>
         <div class="border rounded border-gray-400 p-4 bg-gray-200">
-          <span class="break-all select-color" x-text="data.url" />
+          <span class="break-all select-color" x-text="url" />
         </div>
 
-        <h3 class="mt-3 block uppercase tracking-wide text-xs font-bold mb-2">Key</h3>
+        <h3 class="select-none mt-3 block uppercase tracking-wide text-xs font-bold mb-2">Key</h3>
         <div class="border rounded border-gray-400 p-4 bg-gray-200">
-          <span class="break-all select-color" x-text="data.key" />
+          <span class="break-all select-color" x-text="key" />
         </div>
       </div>
 
-      <div class="mt-6 space-y-2">
+      <div class="mt-6 space-y-2 select-none">
         <p>This link expires in <span class="font-bold" x-text="expiryText"></span>, and can only be viewed once.</p>
         <p class="text-red-400"><a href="#" class="underline">Click here to delete it immediately</a></p>
       </div>
@@ -81,7 +81,6 @@
       password: null,
       error: null,
       data: null,
-      key: null,
       periods: [
         {
           value: '5M',
@@ -108,35 +107,74 @@
           text: '7 Days',
         }
       ],
+      key: null,
 
       get expiryText() {
         return this.periods.find(x => x.value === this.expires).text
       },
 
-      encryptSecret() {
-        let enc = new TextEncoder()
-        let encoded = this.
+      get url() {
+        return `${window.location.origin}/${this.data.id}`
+      },
+
+      get fullUrl() {
+        return `${this.url}#${this.key}`
+      },
+
+      async generateKey() {
+        return window.crypto.subtle.generateKey(
+          {
+            name: "AES-GCM",
+            length: 256
+          },
+          true,
+          ["encrypt", "decrypt"]
+        )
+      },
+
+      async encryptSecret() {
+        const key = await this.generateKey()
+        this.iv = window.crypto.getRandomValues(new Uint8Array(12))
+        this.key = (await window.crypto.subtle.exportKey('jwk', key)).k
+
+        return window.crypto.subtle.encrypt(
+          {
+            name: "AES-GCM",
+            iv: this.iv
+          },
+          key,
+          new TextEncoder().encode(JSON.stringify(this.secret)),
+        )
       },
       
       async newSecret() {
         this.submitting = true
 
         try {
+          const payload = await this.encryptSecret()
+
+          const fd = new FormData()
+          fd.append('json_data', JSON.stringify({
+            expires: this.expires,
+            password: this.password
+          }))
+          fd.append('iv', this.iv)
+          fd.append('content', payload)
+
+
           const response = await fetch('/secret', {
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
-            body: JSON.stringify({
-              content: this.content,
-              expires: this.expires,
-              password: this.password
-            })
+            body: fd
           })
 
           if (response.status == 201) {
             const json = await response.json()
             this.data = json
           } else {
+
+            // TODO: Presuming that the error is the password
             const json = await response.json()
             this.error = json.error
             window.setTimeout(() => {
@@ -146,7 +184,7 @@
               this.$nextTick(() => {
                 document.getElementById('password').focus()
               })
-            }, 2500)
+            }, 1000)
           }
 
         } catch(e) {
