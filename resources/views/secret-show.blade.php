@@ -5,7 +5,7 @@
   <template x-if="message">
     <div>
       <div class="select-none text-red-500 text-sm italic leading-tight mb-6 text-center">This message has already been deleted from the server and cannot be retrieved again. Please save the contents securely before closing the browser.</div>
-      <div class="select-color w-full bg-gray-200 rounded p-4" x-text="message"></div>
+      <div class="select-color w-full bg-gray-200 rounded p-4" x-html="message"></div>
     </div>
   </template>
   <template x-if="error">

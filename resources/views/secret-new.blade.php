@@ -62,7 +62,7 @@
 
       <div class="mt-6 space-y-2 select-none">
         <p>This link expires in <span class="font-bold" x-text="expiryText"></span>, and can only be viewed once.</p>
-        <p class="text-red-400"><a href="#" class="underline">Click here to delete it immediately</a></p>
+        <p class="text-red-400"><span x-on:click="deleteSecret" href="#" class="underline">Click here to delete it immediately</span></p>
       </div>
     </div>
   </template>
@@ -125,12 +125,8 @@
         return `${this.url}#${this.key}`
       },
 
-      get messagePadded() {
-        if (this.message.length % 2) {
-          return this.message + '\n'
-        } else {
-          return this.message
-        }
+      get messageWithBreaks() {
+        return this.message.replaceAll('\n', '<br/>')
       },
 
       async generateKey() {
@@ -149,7 +145,7 @@
 
         try {
           const encoder = new TextEncoder()
-          const messageUTF8 = encoder.encode(this.message)
+          const messageUTF8 = encoder.encode(this.messageWithBreaks)
 
           const iv = window.crypto.getRandomValues(new Uint8Array(12));
           const algorithm = {
@@ -209,6 +205,14 @@
           console.error(e)
           this.error = e
         }
+      },
+
+      async deleteSecret() {
+        fetch(window.location.origin + '/' + this.data.id, {
+          method: 'DELETE'
+        }).then(() => {
+          location.reload()
+        })
       }
     }
   }
