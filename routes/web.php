@@ -26,3 +26,6 @@ $router->get('{id}', [
     'uses' => 'SecretController@show'
 ]);
 
+$router->delete('{id}', [
+    'uses' => 'SecretController@delete'
+]);

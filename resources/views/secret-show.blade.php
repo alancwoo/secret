@@ -4,8 +4,8 @@
 <div x-data="secret()" x-init="mounted">
   <template x-if="message">
     <div>
+      <div class="select-none text-red-500 text-sm italic leading-tight mb-6 text-center">This message has already been deleted from the server and cannot be retrieved again. Please save the contents securely before closing the browser.</div>
       <div class="select-color w-full bg-gray-200 rounded p-4" x-text="message"></div>
-      <div class="select-none text-red-500 text-sm italic leading-tight mt-3">This message has already been deleted from the server and cannot be viewed again. Please save securely.</div>
     </div>
   </template>
   <template x-if="error">
@@ -16,15 +16,6 @@
 
 @section('footer')
 <script>
-  function str2ab(str) {
-    var buf = new ArrayBuffer(str.length*2)
-    var bufView = new Uint16Array(buf)
-    for (var i=0, strLen=str.length; i < strLen; i++) {
-      bufView[i] = str.charCodeAt(i)
-    }
-    return buf
-  }  
-
   function secret() {
     return {
       key: window.location.hash.substring(1),
@@ -60,13 +51,17 @@
           const decrypted = await window.crypto.subtle.decrypt(
             {
               name: "AES-GCM",
-              iv: str2ab(ivStr)
+              iv: window.b64.decode(ivStr)
             },
             decryptionKey,
-            str2ab(content)
+            window.b64.decode(content)
           )
 
           const decoded = new window.TextDecoder().decode(new Uint8Array(decrypted))
+
+          fetch(window.location.origin + window.location.pathname, {
+            method: 'DELETE'
+          })
 
           this.message = decoded
 

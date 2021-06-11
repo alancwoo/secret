@@ -73,7 +73,6 @@
 
 @section('footer')
 <script>
-
   function ab2str(buf) {
     return String.fromCharCode.apply(null, new Uint16Array(buf));
   } 
@@ -150,7 +149,7 @@
 
         try {
           const encoder = new TextEncoder()
-          const messageUTF8 = encoder.encode(this.messagePadded)
+          const messageUTF8 = encoder.encode(this.message)
 
           const iv = window.crypto.getRandomValues(new Uint8Array(12));
           const algorithm = {
@@ -183,8 +182,8 @@
             body: JSON.stringify({
               password: this.password,
               expires: this.expires,
-              content: ab2str(messageEncryptedUTF8),
-              iv: ab2str(iv.buffer)
+              content: window.b64.encode(messageEncryptedUTF8),
+              iv: window.b64.encode(iv)
             })
           })
 
