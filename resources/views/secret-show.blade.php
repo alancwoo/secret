@@ -9,7 +9,10 @@
     </div>
   </template>
   <template x-if="error">
-    <div class="mt-3 text-red-400" x-text="error"></div>
+    <div>
+      <div class="mt-3 text-red-400 text-center" x-text="error"></div>
+      <img src="/images/cliparts/{{ rand(1,16) }}.jpg" class="max-w-md mx-auto mt-6" />
+    </div>
   </template>
 </div>
 @stop
@@ -65,15 +68,14 @@
 
           this.message = decoded
 
+          window.onbeforeunload = function() {
+            return true
+          }
+
         } catch(e) {
-          console.error(e)
-          this.error = e
+          this.error = "The message does not exist, expired, or the key is incorrect. Please try again." 
         }
       }
     }
-  }
-
-  window.onbeforeunload = function() {
-    return true
-  }
+  }  
 </script>
