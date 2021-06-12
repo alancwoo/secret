@@ -67,7 +67,7 @@
           })
 
           this.message = window.sanitizeHtml(decoded, {
-            allowedTags: [ 'br' ]
+            allowedTags: @json(env('ALLOWED_TAGS', 'br')).split(',')
           })
 
           window.onbeforeunload = function() {

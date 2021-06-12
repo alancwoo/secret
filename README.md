@@ -15,7 +15,8 @@ It is even better to send the URL and the KEY separately through different chann
 ## Install
 - Clone the repo
 - Copy `.env.example` to `.env`
-- Configure `APP_URL` with the url, `APP_KEY` with a random string, `NEW_ITEM_PASSWORD` with a password for the creation of new items. (A password is highly recommended. If no password is set, anyone can create secrets)
+- Configure `APP_URL` with the url, `APP_KEY` with a random string, `NEW_ITEM_PASSWORD` with a password for the creation of new items. (Highly recommended, see [Why set a password](#why-set-a-password)).
+- If desired, adjust `ALLOWED_TAGS` as a comma separated list `br,a,img`
 - `touch database/database.sqlite`
 - `composer install`
 - `php artisan migrate`
@@ -26,7 +27,12 @@ It is even better to send the URL and the KEY separately through different chann
 - Set URL in `webpack.mix.js`
 - `npx mix watch`
 
+## Why Set a Password?
+- A password is highly recommended. If no password is set, anyone can create secrets
+- There's no rate limiter, so without a password a troll could hammer the endpoint to create secrets
+- There's no CSRF protection, though an irrelevant vector since without a password, anyone can create secrets anyways
+- Sanitization can't be performed server-side since the data is e2e encrypted, a sanitization occurs (as per the `ALLOWED_TAGS` environment variable) before displaying the secret. An unlikely vector, since it is sanitized before display, but worth mentioning.
+
 ## Notes
-- There's no rate limiter, so I definitely suggest setting a password.
 - Not tested on IE/Edge, but from a look at the [Compatibility table](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto#browser_compatibility) the requirements should be supported
 - Thank you [Pichiste](https://github.com/pichiste) for helping debug the nightmare of SubtleCrypto ArrayBuffer <> String conversions.
