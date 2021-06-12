@@ -26,6 +26,7 @@ It is even better to send the URL and the KEY separately through different chann
 - `npm i`
 - Set URL in `webpack.mix.js`
 - `npx mix watch`
+- Build for production with `npx mix --production`
 
 ## Why Set a Password?
 - A password is highly recommended. If no password is set, anyone can create secrets
