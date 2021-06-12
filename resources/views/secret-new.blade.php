@@ -44,7 +44,7 @@
   <template x-if="data">
     <div class="mt-6">
       <h1 class="text-green-400 select-none">Your secret has been encrypted and saved securely. Please share the link below.</h1>
-      <div class="border rounded border-gray-400 p-4 mt-3 bg-gray-200">
+      <div class="border rounded border-gray-400 p-4 mt-3 bg-gray-200 select-all cursor-pointer">
         <span class="break-all select-color" x-text="fullUrl" />
       </div>
 
@@ -52,12 +52,12 @@
         <p class="text-green-400 select-none">For increased security you may choose to send the URL and KEY separately (e.g. one by email and another by text)</p>
 
         <h3 class="select-none mt-3 block uppercase tracking-wide text-xs font-bold mb-2">URL</h3>
-        <div class="border rounded border-gray-400 p-4 bg-gray-200">
+        <div class="border rounded border-gray-400 p-4 bg-gray-200 select-all cursor-pointer">
           <span class="break-all select-color" x-text="url" />
         </div>
 
         <h3 class="select-none mt-3 block uppercase tracking-wide text-xs font-bold mb-2">Key</h3>
-        <div class="border rounded border-gray-400 p-4 bg-gray-200">
+        <div class="border rounded border-gray-400 p-4 bg-gray-200 select-all cursor-pointer select-color">
           #<span class="break-all select-color" x-text="key" />
         </div>
       </div>
