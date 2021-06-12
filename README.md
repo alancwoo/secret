@@ -1,6 +1,8 @@
 # 🔒 Secret
 A simple php ([lumen](https://lumen.laravel.com)) app for sharing sensitive text (basically like [onetimesecret](https://onetimesecret.com)), but with full end-to-end AES-256-GCM encryption so even the server has no access to the data, and developed with very simple deployment in mind.
 
+![Screenshot](screenshot.png)
+
 ## What is it for
 I often need to send credentials or sensitive information to clients and colleagues and really prefer not to send these things over email/chat where they remain forever prone to breaches and also attached to a context in email threads (eg, it is clear such data is connected to a site/identity/account).
 
