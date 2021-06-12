@@ -14,9 +14,9 @@ class SecretController extends Controller
   {
     $secret = Secret::findOrFail($id);
 
-    $now = new DateTime();
+    $expires = strtotime($secret->expires);
 
-    if ($now > $secret->expires) {
+    if (time() > $expires) {
       // Delete expired message
       $secret->delete();
       return response(view("errors.404"), 404);

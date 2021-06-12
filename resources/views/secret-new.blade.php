@@ -83,21 +83,21 @@
     return {
       submitting: false,
       message: null,
-      expires: '5M',
+      expires: 'T5M',
       password: null,
       error: null,
       data: null,
       periods: [
         {
-          value: '5M',
+          value: 'T5M',
           text: '5 Minutes',
         },
         {
-          value: '1H',
+          value: 'T1H',
           text: '1 Hour',
         },
         {
-          value: '12H',
+          value: 'T12H',
           text: '12 Hours',
         },
         {
