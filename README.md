@@ -1,33 +1,21 @@
-# Lumen PHP Framework
+# Secret
+This is a tool for sharing sensitive text (basically like [onetimesecret](https://onetimesecret.com/)), but with end-to-end encryption with AES-256-GCM so even the server has no access to the data and made to be very easily self hosted,
 
-[![Build Status](https://travis-ci.org/laravel/lumen-framework.svg)](https://travis-ci.org/laravel/lumen-framework)
-[![Total Downloads](https://img.shields.io/packagist/dt/laravel/framework)](https://packagist.org/packages/laravel/lumen-framework)
-[![Latest Stable Version](https://img.shields.io/packagist/v/laravel/framework)](https://packagist.org/packages/laravel/lumen-framework)
-[![License](https://img.shields.io/packagist/l/laravel/framework)](https://packagist.org/packages/laravel/lumen-framework)
+## Requirements
+- Requires PHP7.x (Lumen does not seem to support PHP8 yet)
 
-Laravel Lumen is a stunningly fast PHP micro-framework for building web applications with expressive, elegant syntax. We believe development must be an enjoyable, creative experience to be truly fulfilling. Lumen attempts to take the pain out of development by easing common tasks used in the majority of web projects, such as routing, database abstraction, queueing, and caching.
+## Install
+- Clone the repo
+- Copy `.env.example` to `.env`
+- Configure `APP_URL` with the url, `APP_KEY` with a random string, `NEW_ITEM_PASSWORD` with a password for the creation of new items. (If no password is set, anyone can create secrets)
+- `touch database/database.sqlite`
+- `php artisan migrate`
 
-## Official Documentation
+## Dev
+- `composer install`
+- `npm i`
+- Set URL in `webpack.mix.js` and run `npx mix watch`
 
-Documentation for the framework can be found on the [Lumen website](https://lumen.laravel.com/docs).
-
-## Contributing
-
-Thank you for considering contributing to Lumen! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Lumen, please send an e-mail to Taylor Otwell at taylor@laravel.com. All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Lumen framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-
-# Notes
-- Requires PHP7 (Lumen does not seem to support PHP8 yet)
-
-# Build/watch assets
-1. `composer install`
-2. `npm i`
-3. Set URL in `webpack.mix.js` and run `npx mix watch`
-4. `touch /database/database.sqlite`
+## Notes
+- There's no rate limiter, so I definitely suggest setting a password.
+- Thank you [Pichiste](https://github.com/pichiste) for helping debug the nightmare of SubtleCrypto ArrayBuffer <> String conversions.
