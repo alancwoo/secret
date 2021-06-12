@@ -13,11 +13,22 @@ class SecretController extends Controller
   public function show($id)
   {
     $secret = Secret::findOrFail($id);
-    return view('secret-show', [
-      'id' => $secret->id,
-      'content' => $secret->content,
-      'iv' => $secret->iv
-    ]);
+
+    $now = new DateTime();
+
+    if ($now > $secret->expires) {
+      // Delete expired message
+      $secret->delete();
+      return response(view("errors.404"), 404);
+    } else {
+      // Return message contents
+      return view('secret-show', [
+        'id' => $secret->id,
+        'content' => $secret->content,
+        'iv' => $secret->iv
+      ]);
+    }
+
   }
 
   public function create(Request $request)

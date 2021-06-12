@@ -1,8 +1,14 @@
-# Secret
-This is a tool for sharing sensitive text (basically like [onetimesecret](https://onetimesecret.com/)), but with end-to-end encryption with AES-256-GCM so even the server has no access to the data and made to be very easily self hosted,
+# 🔒 Secret
+A simple web app for sharing sensitive text (basically like [onetimesecret](https://onetimesecret.com)), but with full end-to-end AES-256-GCM encryption so even the server has no access to the data, and was developed with very simple deployment in mind.
+
+## What is it for
+I often need to send credentials or sensitive information to clients and colleagues and really prefer not to send these things over email/chat where they remain forever prone to breaches and also attached to a context in email threads (eg, it is clear such data is connected to a site/identity/account).
+
+It is even better to send the URL and the KEY separately through different channels and instruct the user to recombine them in the address bar.
 
 ## Requirements
 - Requires PHP7.x (Lumen does not seem to support PHP8 yet)
+- [Must be hosted/served with https and a proper certificate](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
 
 ## Install
 - Clone the repo
@@ -18,4 +24,5 @@ This is a tool for sharing sensitive text (basically like [onetimesecret](https:
 
 ## Notes
 - There's no rate limiter, so I definitely suggest setting a password.
+- Not tested on IE/Edge, but from a look at the [Compatibility table](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto#browser_compatibility) the needs of this app should be supported through AES-GCM
 - Thank you [Pichiste](https://github.com/pichiste) for helping debug the nightmare of SubtleCrypto ArrayBuffer <> String conversions.

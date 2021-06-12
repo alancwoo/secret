@@ -58,7 +58,7 @@
 
         <h3 class="select-none mt-3 block uppercase tracking-wide text-xs font-bold mb-2">Key</h3>
         <div class="border rounded border-gray-400 p-4 bg-gray-200">
-          <span class="break-all select-color" x-text="key" />
+          #<span class="break-all select-color" x-text="key" />
         </div>
       </div>
 
