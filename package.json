@@ -22,5 +22,7 @@
     "postcss": "^8.3.0",
     "tailwindcss": "^2.1.4"
   },
-  "dependencies": {}
+  "dependencies": {
+    "sanitize-html": "^2.4.0"
+  }
 }

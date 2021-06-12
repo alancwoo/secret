@@ -66,7 +66,9 @@
             method: 'DELETE'
           })
 
-          this.message = decoded
+          this.message = window.sanitizeHtml(decoded, {
+            allowedTags: [ 'br' ]
+          })
 
           window.onbeforeunload = function() {
             return true
