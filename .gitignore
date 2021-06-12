@@ -7,3 +7,4 @@ Homestead.yaml
 /database/database.sqlite
 node_modules
 .DS_Store
+*.sh

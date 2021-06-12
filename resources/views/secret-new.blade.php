@@ -21,11 +21,13 @@
           </div>
           <p class="text-gray-400 text-xs italic">Secret will always be deleted after viewing</p>
         </div>
-        <div class="w-full">
-          <label class="block uppercase tracking-wide text-xs font-bold mb-2" for="password">Password</label>
-          <input id="password" type="password" x-model="password" id="password" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 mb-2 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="******************" required />
-          <p class="text-gray-400 text-xs italic">Your password is set in the app config</p>
-        </div>
+
+        @if (env('NEW_ITEM_PASSWORD') !== '')
+          <div class="w-full">
+            <label class="block uppercase tracking-wide text-xs font-bold mb-2" for="password">Password</label>
+            <input id="password" type="password" x-model="password" id="password" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 mb-2 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" placeholder="******************" required />
+          </div>
+        @endif
       </div>
       <button class="block w-full hover:bg-gray-200 border-4 mt-6 p-4 rounded font-bold" type="submit">
         OK

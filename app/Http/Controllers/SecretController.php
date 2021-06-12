@@ -10,11 +10,6 @@ use DateInterval;
 
 class SecretController extends Controller
 {
-  private function deleteSecret($id)
-  {
-    Secret::findOrFail($id)->delete();
-  }
-
   public function show($id)
   {
     $secret = Secret::findOrFail($id);
@@ -31,7 +26,7 @@ class SecretController extends Controller
     $pass = $data['password'];
 
     // Check password
-    if ($pass === env('NEW_ITEM_PASSWORD')) {
+    if (env('NEW_ITEM_PASSWORD') === '' || $pass === env('NEW_ITEM_PASSWORD')) {
 
       // Set expiry
       $now = new \DateTime();
