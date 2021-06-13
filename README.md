@@ -37,3 +37,6 @@ It is even better to send the URL and the KEY separately through different chann
 ## Notes
 - Not tested on IE/Edge, but from a look at the [Compatibility table](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto#browser_compatibility) the requirements should be supported
 - Thank you [Pichiste](https://github.com/pichiste) for helping debug the nightmare of SubtleCrypto ArrayBuffer <> String conversions.
+
+## License
+[GNU General Public License version 2](https://opensource.org/licenses/GPL-2.0)
