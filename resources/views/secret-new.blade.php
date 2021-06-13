@@ -4,7 +4,34 @@
 <div x-data="secret()">
   <h1 class="font-bold mb-3">Secret</h1>
   <form @submit.prevent="newSecret()" action="/secret" class="flex flex-col space-y-6">
+    
+    <!-- Message -->
     <textarea x-model="message" x-bind:disabled="submitting" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 h-48" x-bind:class="{ 'text-gray-300 bg-gray-500': submitting }" placeholder="Enter your secret..." autofocus required></textarea>
+
+    <!-- Files -->
+    <div x-on:dragover.prevent="addingFiles = true" x-on:dragleave.prevent="addingFiles = false" x-on:drop.prevent="drop">
+      <label class="block uppercase tracking-wide text-xs font-bold mb-2" for="files">Files</label>
+      <label class="appearance-none block w-full bg-gray-200 text-gray-400 border border-gray-200 rounded py-6 px-4 mb-2 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 cursor-pointer" x-bind:class="{'ring-4 ring-gray-300': addingFiles}" for="files">
+        <input type="file" class="sr-only" id="files" multiple="true" x-on:change="files = Object.values($event.target.files)">
+        <template x-if="!addingFiles && !files">
+          <div class="text-center">Click or drop files here</div>
+        </template>
+        <template x-if="addingFiles">
+          <div class="text-gray-600 pulse text-center">Drop files here</div>
+        </template>
+        <template x-if="!addingFiles && files">
+          <ol class="list-decimal">
+            <template x-for="file in fileNames" :key="file">
+              <li x-text="file" class="truncate"></li>
+            </template>
+          </ol>
+        </template>
+      </label>
+      <template x-if="files">
+        <span class="underline text-xs mt-3 text-gray-400 cursor-pointer italic" @click="files = null">Remove all files</span>
+      </template>
+    </div>
+
     <div x-show="!submitting">
       <div class="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-6">
         <div class="w-full">
@@ -73,7 +100,7 @@
 @stop
 
 
-@section('footer')
+@push('head')
 <script>
   function ab2str(buf) {
     return String.fromCharCode.apply(null, new Uint16Array(buf));
@@ -83,6 +110,8 @@
     return {
       submitting: false,
       message: null,
+      files: null,
+      addingFiles: false,
       expires: 'T5M',
       password: null,
       error: null,
@@ -123,12 +152,23 @@
         return `${window.location.origin}/${this.data.id}`
       },
 
+      get fileNames() {
+        return [...this.files].map(x => x.name)
+      },
+
       get fullUrl() {
         return `${this.url}#${this.key}`
       },
 
       get messageWithBreaks() {
         return this.message.replaceAll('\n', '<br/>')
+      },
+
+      drop(ev) {
+        ev.preventDefault();
+        this.files = ev.dataTransfer.files
+        console.log(this.files)
+        this.addingFiles = false
       },
 
       async generateKey() {
@@ -180,8 +220,8 @@
             body: JSON.stringify({
               password: this.password,
               expires: this.expires,
-              content: window.b64.encode(messageEncryptedUTF8),
-              iv: window.b64.encode(iv)
+              content: b64.encode(messageEncryptedUTF8),
+              iv: b64.encode(iv)
             })
           })
 
@@ -220,4 +260,4 @@
   }
 </script>
 
-@stop
+@endpush

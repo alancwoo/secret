@@ -17,7 +17,7 @@
 </div>
 @stop
 
-@section('footer')
+@push('head')
 <script>
   function secret() {
     return {
@@ -54,10 +54,10 @@
           const decrypted = await window.crypto.subtle.decrypt(
             {
               name: "AES-GCM",
-              iv: window.b64.decode(ivStr)
+              iv: b64.decode(ivStr)
             },
             decryptionKey,
-            window.b64.decode(content)
+            b64.decode(content)
           )
 
           const decoded = new window.TextDecoder().decode(new Uint8Array(decrypted))
@@ -66,7 +66,7 @@
             method: 'DELETE'
           })
 
-          this.message = window.sanitizeHtml(decoded, {
+          this.message = sanitizeHtml(decoded, {
             allowedTags: @json(env('ALLOWED_TAGS', 'br')).split(',')
           })
 
@@ -81,3 +81,4 @@
     }
   }  
 </script>
+@endpush
