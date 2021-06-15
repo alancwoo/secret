@@ -19,6 +19,8 @@
 
 @push('head')
 <script>
+  const b64 = require('base64-arraybuffer')
+
   function secret() {
     return {
       key: window.location.hash.substring(1),

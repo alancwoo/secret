@@ -1,4 +1,6 @@
 // const b64 = require('base64-arraybuffer')
-import 'base64-arraybuffer'
-const sanitizeHtml = require('sanitize-html')
+window.b64 = require('base64-arraybuffer')
+window.sanitizeHtml = require('sanitize-html')
+window.fflate = require('fflate')
+window.JSZip = require('jszip')
 import 'alpinejs'

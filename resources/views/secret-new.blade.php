@@ -9,15 +9,11 @@
     <textarea x-model="message" x-bind:disabled="submitting" class="appearance-none block w-full bg-gray-200 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 h-48" x-bind:class="{ 'text-gray-300 bg-gray-500': submitting }" placeholder="Enter your secret..." autofocus required></textarea>
 
     <!-- Files -->
-    <div x-on:dragover.prevent="addingFiles = true" x-on:dragleave.prevent="addingFiles = false" x-on:drop.prevent="drop">
+    <div x-on:dragover.prevent="addingFiles = true" x-on:dragleave.prevent="addingFiles = false" x-on:drop.prevent="drop" x-bind:class="{ 'pointer-events-none': submitting }">
       <label class="block uppercase tracking-wide text-xs font-bold mb-2" for="files">Files</label>
-      <label class="appearance-none block w-full bg-gray-200 text-gray-400 border border-gray-200 rounded py-6 px-4 mb-2 leading-tight focus:outline-none focus:bg-white focus:border-gray-500 cursor-pointer" x-bind:class="{'ring-4 ring-gray-300': addingFiles}" for="files">
-        <input type="file" class="sr-only" id="files" multiple="true" x-on:change="files = Object.values($event.target.files)">
-        <template x-if="!addingFiles && !files">
-          <div class="text-center">Click or drop files here</div>
-        </template>
-        <template x-if="addingFiles">
-          <div class="text-gray-600 pulse text-center">Drop files here</div>
+      <label class="appearance-none block w-full bg-gray-200 text-gray-400 border border-gray-200 rounded py-6 px-4 mb-2 leading-tight focus:outline-none focus:bg-white focus:border-gray-500" x-bind:class="{'ring-4 ring-gray-300': addingFiles}" for="files">
+        <template x-if="!files || addingFiles">
+          <div class="text-center h-8 flex items-center justify-center"><div>Drop files here</div></div>
         </template>
         <template x-if="!addingFiles && files">
           <ol class="list-decimal">
@@ -27,7 +23,7 @@
           </ol>
         </template>
       </label>
-      <template x-if="files">
+      <template x-if="files && !submitting">
         <span class="underline text-xs mt-3 text-gray-400 cursor-pointer italic" @click="files = null">Remove all files</span>
       </template>
     </div>
@@ -63,7 +59,7 @@
   </form>
 
   <div class="mt-3" x-show="submitting && !data">
-    <div class="w-full text-center pulse">Submitting...</div>
+    <div class="w-full text-center pulse" x-text="progressText"></div>
   </div>
 
   <div class="mt-3 text-red-400" x-show="error && !submitting" x-text="error"></div>
@@ -102,10 +98,6 @@
 
 @push('head')
 <script>
-  function ab2str(buf) {
-    return String.fromCharCode.apply(null, new Uint16Array(buf));
-  } 
-
   function secret() {
     return {
       submitting: false,
@@ -116,6 +108,7 @@
       password: null,
       error: null,
       data: null,
+      progressText: 'Submitting...',
       periods: [
         {
           value: 'T5M',
@@ -165,10 +158,29 @@
       },
 
       drop(ev) {
-        ev.preventDefault();
+        ev.preventDefault()
         this.files = ev.dataTransfer.files
-        console.log(this.files)
         this.addingFiles = false
+
+        let filesArray = []
+
+        Array.from(this.files).map((x) => {
+          filesArray[x.name] = [x, {
+            level: 9
+          }]
+        })
+
+        try{
+
+        const zipped = fflate.zipSync({
+          'files': {
+            'bob': this.files[0]
+          }    
+        })
+        console.log(zipped)
+        } catch (e) {
+          console.error(e)
+        }
       },
 
       async generateKey() {
@@ -213,35 +225,73 @@
 
           this.key = (await window.crypto.subtle.exportKey("jwk", key)).k
 
-          const response = await fetch('/secret', {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            body: JSON.stringify({
-              password: this.password,
-              expires: this.expires,
-              content: b64.encode(messageEncryptedUTF8),
-              iv: b64.encode(iv)
-            })
-          })
+          const fd = new FormData()
+          fd.append('json_data', JSON.stringify({
+            password: this.password,
+            expires: this.expires,
+            content: b64.encode(messageEncryptedUTF8),
+            iv: b64.encode(iv)
+          }))
 
-          if (response.status == 201) {
-            const json = await response.json()
-            this.data = json
-          } else {
+          if (this.files) {
+            console.log(this.files)
+            // this.progressText = 'Compressing files...'
 
-            // TODO: Presuming that the error is the password
-            const json = await response.json()
-            this.error = json.error
-            window.setTimeout(() => {
-              this.password = ''
-              this.submitting = false
+            // const zip = new window.JSZip()
+            // const secretFiles = zip.folder('secret')
 
-              this.$nextTick(() => {
-                document.getElementById('password').focus()
-              })
-            }, 1000)
+            // console.log(zip)
+
+            // [...this.files].map((x) => {
+            //   secretFiles.loadAsync(x)
+            // })
+
+            // console.log(zip)
+
+            // const filesObject = [...this.files].reduce((o, i) => {
+            //   o[i['name']] = i
+            //   return o
+            // }, {})
+            // // compress files
+            // const zip = fflate.zip(filesObject, {
+            //   level: 8,
+            //   mtime: 0
+            // }, (data) => {
+            //   console.log(data)
+            // })
+            // console.log(zip)
+
+            // const filesEncrypted = await window.crypto.subtle.encryt(
+            //   algorithm,
+            //   key,
+
+            // )
           }
+
+          // const response = await fetch('/secret', {
+          //   method: 'POST',
+          //   mode: 'cors',
+          //   cache: 'no-cache',
+          //   body: fd
+          // })
+
+          // if (response.status == 201) {
+          //   const json = await response.json()
+          //   this.data = json
+          // } else {
+
+          //   // TODO: Presuming that the error is the password
+          //   const json = await response.json()
+          //   this.error = json.error
+          //   window.setTimeout(() => {
+          //     this.password = ''
+          //     this.submitting = false
+
+          //     this.$nextTick(() => {
+          //       document.getElementById('password').focus()
+          //     })
+          //   }, 1000)
+          // }
 
         } catch(e) {
           console.error(e)
