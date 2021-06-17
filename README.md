@@ -8,6 +8,8 @@ I often need to send credentials or sensitive information to clients and colleag
 
 It is even better to send the URL and the KEY separately through different channels and instruct the user to recombine them in the address bar.
 
+**Coming soon:** support for binaries/file uploads.
+
 ## Requirements
 - Requires PHP7.x (Lumen does not seem to support PHP8 yet)
 - [Must be hosted/served over https with a proper certificate](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
