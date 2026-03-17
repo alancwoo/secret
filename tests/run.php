@@ -345,6 +345,163 @@ echo "\n22. 404 for unknown routes\n";
 $r = request('GET', '/nonexistent/path');
 assert_eq(404, (int)$r['status'], 'unknown path returns 404');
 
+// ---------------------------------------------------------------
+echo "\n23. Create request — valid\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['password' => 'testpass', 'label' => 'SSH key', 'expires' => '1D']);
+assert_eq(201, $r['status'], 'returns 201');
+assert_true(!empty($r['body']['token']), 'returns a token');
+assert_true(!empty($r['body']['id']), 'returns an id');
+$reqToken = $r['body']['token'];
+
+// ---------------------------------------------------------------
+echo "\n24. Create request — wrong password\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['password' => 'wrong', 'label' => 'test']);
+assert_eq(401, $r['status'], 'returns 401 for wrong password');
+
+// ---------------------------------------------------------------
+echo "\n25. Create request — no password\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['label' => 'test']);
+assert_eq(401, $r['status'], 'returns 401 for missing password');
+
+// ---------------------------------------------------------------
+echo "\n26. Request page — valid token\n";
+// ---------------------------------------------------------------
+$ch = curl_init("$baseUrl/r/$reqToken");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$html = curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+assert_eq(200, $status, 'request page returns 200');
+assert_true(strpos($html, 'Send a Secret') !== false, 'request page shows title');
+assert_true(strpos($html, 'SSH key') !== false, 'request page shows label');
+assert_true(strpos($html, $reqToken) !== false, 'request page contains token in JS');
+
+// ---------------------------------------------------------------
+echo "\n27. Request page — invalid token\n";
+// ---------------------------------------------------------------
+$ch = curl_init("$baseUrl/r/0000000000000000000000000000dead");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+assert_eq(404, $status, 'invalid token returns 404');
+
+// ---------------------------------------------------------------
+echo "\n28. Submit secret via request token\n";
+// ---------------------------------------------------------------
+$r = request('POST', "/api/request/$reqToken/submit", [
+    'content'  => base64_encode('requested-secret'),
+    'iv'       => base64_encode('req-iv-12345'),
+    'expires'  => '1D',
+    'maxViews' => 1,
+]);
+assert_eq(201, $r['status'], 'submit returns 201');
+assert_true(!empty($r['body']['id']), 'returns secret id');
+$reqSecretId = $r['body']['id'];
+
+// Verify the secret was created
+$r = request('GET', "/api/secret/$reqSecretId");
+assert_eq(200, $r['status'], 'submitted secret is fetchable');
+assert_eq(base64_encode('requested-secret'), $r['body']['content'], 'content matches');
+
+// ---------------------------------------------------------------
+echo "\n29. Request token — used, cannot reuse\n";
+// ---------------------------------------------------------------
+$r = request('POST', "/api/request/$reqToken/submit", [
+    'content' => base64_encode('second-attempt'),
+    'iv'      => base64_encode('iv-12345678'),
+]);
+assert_eq(404, $r['status'], 'used token returns 404');
+
+// Request page should also 404 now
+$ch = curl_init("$baseUrl/r/$reqToken");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+assert_eq(404, $status, 'used token page returns 404');
+
+// ---------------------------------------------------------------
+echo "\n30. Submit via request — missing fields\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['password' => 'testpass', 'expires' => '1D']);
+$t2 = $r['body']['token'];
+
+$r = request('POST', "/api/request/$t2/submit", []);
+assert_eq(400, $r['status'], 'returns 400 for missing content/iv');
+
+// Clean up — token is still unused, submit properly
+$r = request('POST', "/api/request/$t2/submit", [
+    'content' => base64_encode('test'), 'iv' => base64_encode('test-iv-1234'),
+]);
+assert_eq(201, $r['status'], 'valid submit after failed attempt');
+
+// ---------------------------------------------------------------
+echo "\n31. Submit via request — file upload\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['password' => 'testpass', 'expires' => '1D']);
+$t3 = $r['body']['token'];
+
+$r = request('POST', "/api/request/$t3/submit", [
+    'content'  => base64_encode('encrypted-file-data'),
+    'iv'       => base64_encode('file-iv-1234'),
+    'isFile'   => true,
+    'filename' => 'credentials.txt',
+    'mimetype' => 'text/plain',
+    'expires'  => '1D',
+    'maxViews' => 3,
+]);
+assert_eq(201, $r['status'], 'file submit returns 201');
+$fileSecId = $r['body']['id'];
+
+$r = request('GET', "/api/secret/$fileSecId");
+assert_eq(true, $r['body']['isFile'], 'isFile is true');
+assert_eq('credentials.txt', $r['body']['filename'], 'filename matches');
+assert_eq('text/plain', $r['body']['mimetype'], 'mimetype matches');
+assert_eq(3, $r['body']['maxViews'], 'maxViews matches');
+request('DELETE', "/api/secret/$fileSecId");
+
+// ---------------------------------------------------------------
+echo "\n32. Expired request token\n";
+// ---------------------------------------------------------------
+$db = new PDO('sqlite:' . $testDb);
+$expiredToken = 'deadbeefdeadbeefdeadbeefdeadbeef';
+$db->prepare('INSERT INTO requests (id, token, label, used, expires, created_at) VALUES (?, ?, ?, 0, ?, ?)')
+   ->execute(['expired-req-id', $expiredToken, 'old request', '2000-01-01T00:00:00Z', '2000-01-01T00:00:00Z']);
+$db = null;
+
+// Page should 404
+$ch = curl_init("$baseUrl/r/$expiredToken");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+assert_eq(404, $status, 'expired request page returns 404');
+
+// Submit should also fail (returns 404 because cleanup purges expired requests)
+$r = request('POST', "/api/request/$expiredToken/submit", [
+    'content' => base64_encode('too late'), 'iv' => base64_encode('iv-too-late1'),
+]);
+assert_eq(404, $r['status'], 'expired request submit returns 404');
+
+// ---------------------------------------------------------------
+echo "\n33. Request without label\n";
+// ---------------------------------------------------------------
+$r = request('POST', '/api/request', ['password' => 'testpass', 'expires' => '1D']);
+assert_eq(201, $r['status'], 'request without label succeeds');
+$noLabelToken = $r['body']['token'];
+
+$ch = curl_init("$baseUrl/r/$noLabelToken");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$html = curl_exec($ch);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+assert_eq(200, $status, 'no-label request page returns 200');
+assert_true(strpos($html, 'Someone has requested') !== false, 'shows generic prompt when no label');
+
 // --- Teardown ---
 
 proc_terminate($process);

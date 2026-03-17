@@ -16,11 +16,10 @@ Secrets are encrypted client-side, viewed once, then deleted. For increased secu
 - Text and file sharing (up to 10MB)
 - Configurable expiry (5 minutes to 7 days, or unlimited)
 - Configurable view limit (1, 3, 5, 10, or unlimited views)
+- Request a secret — generate a one-time link for someone to send you a secret
 - No framework, no Composer, no vendor directory
 - SQLite database (auto-created)
 - Deploy by uploading files to any PHP host
-
-**Coming soon:** support for binaries/file uploads.
 
 ## Requirements
 
@@ -30,21 +29,16 @@ Secrets are encrypted client-side, viewed once, then deleted. For increased secu
 
 ## Install
 
-1. Clone the repo
+1. Clone or upload the repo
 2. Copy `.env.example` to `.env`
 3. Configure `NEW_ITEM_PASSWORD` (recommended — see [Why set a password?](#why-set-a-password))
-4. Point your web server's document root to the `public/` directory
-5. That's it. The SQLite database is created automatically on first request.
+4. That's it. The SQLite database is created automatically on first request.
 
 ## Deploy
 
-Upload these to your server:
+Upload the whole project to your server. A root `.htaccess` redirects all requests into `public/` automatically — no virtual host configuration needed. Works on any shared host with Apache and `mod_rewrite`.
 
-```
-public/       <- document root
-views/
-.env
-```
+If you can configure your web server's document root directly, point it at `public/` for a cleaner setup.
 
 No `composer install`. No `npm install`. No build step. No dependencies at all.
 
@@ -65,6 +59,9 @@ No build step required.
 | `GET` | `/s/{id}` | View/decrypt secret page |
 | `GET` | `/api/secret/{id}` | Fetch encrypted data (JSON) |
 | `DELETE` | `/api/secret/{id}` | Delete a secret |
+| `POST` | `/api/request` | Create a secret request (requires password) |
+| `GET` | `/r/{token}` | Request form (for the recipient) |
+| `POST` | `/api/request/{token}/submit` | Submit a secret via request token |
 
 ## Why Set a Password?
 
@@ -79,7 +76,7 @@ No build step required.
 php tests/run.php
 ```
 
-Runs 83 tests covering the API, view counting, expiry, file uploads, static assets, password protection, input validation, and error handling. Uses a temporary database — safe to run against a live install.
+Runs 111 tests covering the API, view counting, expiry, file uploads, secret requests, static assets, password protection, input validation, and error handling. Uses a temporary database — safe to run against a live install.
 
 ## License
 

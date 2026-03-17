@@ -117,6 +117,16 @@ function db(): PDO {
         $pdo->exec('ALTER TABLE secrets ADD COLUMN views INTEGER NOT NULL DEFAULT 0');
     }
 
+    // Requests table for "request a secret" feature
+    $pdo->exec('CREATE TABLE IF NOT EXISTS requests (
+        id         TEXT PRIMARY KEY,
+        token      TEXT NOT NULL UNIQUE,
+        label      TEXT,
+        used       INTEGER NOT NULL DEFAULT 0,
+        expires    TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )');
+
     return $pdo;
 }
 
@@ -187,6 +197,14 @@ function calculate_expiry(string $code): string {
 function cleanup_expired(): void {
     $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
     db()->prepare('DELETE FROM secrets WHERE expires < ?')->execute([$now]);
+    db()->prepare('DELETE FROM requests WHERE expires < ?')->execute([$now]);
+}
+
+/**
+ * Generate a short random token for request URLs.
+ */
+function random_token(int $length = 32): string {
+    return bin2hex(random_bytes($length / 2));
 }
 
 // ---------------------------------------------------------------------------
@@ -332,6 +350,120 @@ if ($method === 'GET' && preg_match('#^/s/([0-9a-f-]+)$#i', $uri, $m)) {
         'id'          => $id,
         'allowedTags' => env('ALLOWED_TAGS', 'br,a'),
     ]);
+}
+
+// ---------------------------------------------------------------------------
+// Secret Requests — "request a secret from someone"
+// ---------------------------------------------------------------------------
+
+// POST /api/request — Create a request (requires password)
+if ($method === 'POST' && $uri === '/api/request') {
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    // Password is always required to create requests
+    $requiredPass = env('NEW_ITEM_PASSWORD');
+    if ($requiredPass === '') {
+        json_response(['error' => 'NEW_ITEM_PASSWORD must be set to use requests'], 400);
+    }
+    $givenPass = $input['password'] ?? '';
+    if ($givenPass !== $requiredPass) {
+        json_response(['error' => 'Password Incorrect'], 401);
+    }
+
+    $id      = uuid();
+    $token   = random_token();
+    $label   = trim($input['label'] ?? '');
+    $expires = calculate_expiry($input['expires'] ?? '7D');
+    $now     = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+
+    $stmt = db()->prepare('INSERT INTO requests (id, token, label, used, expires, created_at) VALUES (?, ?, ?, 0, ?, ?)');
+    $stmt->execute([$id, $token, $label ?: null, $expires, $now]);
+
+    json_response(['id' => $id, 'token' => $token], 201);
+}
+
+// GET /r/{token} — Show the request form (for the recipient)
+if ($method === 'GET' && preg_match('#^/r/([0-9a-f]+)$#i', $uri, $m)) {
+    $token = $m[1];
+    $stmt = db()->prepare('SELECT * FROM requests WHERE token = ?');
+    $stmt->execute([$token]);
+    $req = $stmt->fetch();
+
+    if (!$req || $req['used']) {
+        http_response_code(404);
+        render('404', ['title' => 'Not Found']);
+    }
+
+    // Check expiry
+    $expires = new DateTime($req['expires'], new DateTimeZone('UTC'));
+    if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
+        db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$req['id']]);
+        http_response_code(404);
+        render('404', ['title' => 'Not Found']);
+    }
+
+    render('request', [
+        'title' => 'Send a Secret',
+        'token' => $token,
+        'label' => $req['label'],
+    ]);
+}
+
+// POST /api/request/{token}/submit — Submit a secret via a request token (no password needed)
+if ($method === 'POST' && preg_match('#^/api/request/([0-9a-f]+)/submit$#i', $uri, $m)) {
+    $token = $m[1];
+
+    // Validate the request token
+    $stmt = db()->prepare('SELECT * FROM requests WHERE token = ?');
+    $stmt->execute([$token]);
+    $req = $stmt->fetch();
+
+    if (!$req || $req['used']) {
+        json_response(['error' => 'Request not found or already used'], 404);
+    }
+
+    $expires = new DateTime($req['expires'], new DateTimeZone('UTC'));
+    if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
+        db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$req['id']]);
+        json_response(['error' => 'Request has expired'], 410);
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (!$input || empty($input['content']) || empty($input['iv'])) {
+        json_response(['error' => 'Missing required fields'], 400);
+    }
+
+    if (strlen($input['content']) > MAX_CONTENT_SIZE) {
+        json_response(['error' => 'Content exceeds maximum size'], 413);
+    }
+
+    // Create the secret (no password check — the token is the auth)
+    $id       = uuid();
+    $secretExpires = calculate_expiry($input['expires'] ?? '1D');
+    $isFile   = !empty($input['isFile']) ? 1 : 0;
+    $maxViews = intval($input['maxViews'] ?? 1);
+    if ($maxViews < 0) $maxViews = 0;
+
+    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+    $stmt = db()->prepare('INSERT INTO secrets (id, content, iv, is_file, filename, mimetype, expires, max_views, views, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)');
+    $stmt->execute([
+        $id,
+        $input['content'],
+        $input['iv'],
+        $isFile,
+        $isFile ? ($input['filename'] ?? null) : null,
+        $isFile ? ($input['mimetype'] ?? null) : null,
+        $secretExpires,
+        $maxViews,
+        $now,
+    ]);
+
+    // Mark the request as used
+    db()->prepare('UPDATE requests SET used = 1 WHERE id = ?')->execute([$req['id']]);
+
+    json_response(['id' => $id], 201);
 }
 
 // ---------------------------------------------------------------------------
