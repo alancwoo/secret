@@ -29,13 +29,12 @@
   var key = location.hash.substring(1);
   var allowedTags = <?= json_encode(explode(',', $allowedTags ?? 'br,a')) ?>;
 
-  if (!Secret.isSecureContext()) {
-    showError('Decryption requires HTTPS. Please access this site over HTTPS.');
-    return;
-  }
-
-  if (!key) {
-    showError('No decryption key provided in URL fragment.');
+  if (!key || !Secret.isSecureContext()) {
+    // No key or insecure context — show the standard 404 page
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('show-error').querySelector('p').textContent =
+      'The message does not exist, expired, or the key is incorrect. Please try again.';
+    document.getElementById('show-error').classList.remove('hidden');
     return;
   }
 

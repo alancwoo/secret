@@ -207,6 +207,23 @@ function random_token(int $length = 32): string {
     return bin2hex(random_bytes($length / 2));
 }
 
+/**
+ * Ensure a minimum response time to mitigate timing attacks.
+ * Call at the start of a sensitive route, then call the returned closure
+ * before responding. This pads the response to a constant duration
+ * regardless of whether the lookup succeeded or failed.
+ */
+function timing_safe(int $minMs = 50): Closure {
+    $start = hrtime(true);
+    return function () use ($start, $minMs) {
+        $elapsed = (hrtime(true) - $start) / 1_000_000; // nanoseconds → ms
+        $remaining = $minMs - $elapsed;
+        if ($remaining > 0) {
+            usleep((int)($remaining * 1000)); // ms → µs
+        }
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Request parsing
 // ---------------------------------------------------------------------------
@@ -248,11 +265,11 @@ if ($method === 'POST' && $uri === '/api/secret') {
         json_response(['error' => 'Content exceeds maximum size'], 413);
     }
 
-    // Password check
+    // Password check (constant-time comparison)
     $requiredPass = env('NEW_ITEM_PASSWORD');
     if ($requiredPass !== '') {
         $givenPass = $input['password'] ?? '';
-        if ($givenPass !== $requiredPass) {
+        if (!hash_equals($requiredPass, $givenPass)) {
             json_response(['error' => 'Password Incorrect'], 401);
         }
     }
@@ -283,12 +300,14 @@ if ($method === 'POST' && $uri === '/api/secret') {
 
 // GET /api/secret/{id} — Fetch secret data (JSON API, used by show page)
 if ($method === 'GET' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m)) {
+    $wait = timing_safe();
     $id   = $m[1];
     $stmt = db()->prepare('SELECT * FROM secrets WHERE id = ?');
     $stmt->execute([$id]);
     $secret = $stmt->fetch();
 
     if (!$secret) {
+        $wait();
         json_response(['error' => 'Secret not found or expired'], 404);
     }
 
@@ -296,6 +315,7 @@ if ($method === 'GET' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m)) 
     $expires = new DateTime($secret['expires'], new DateTimeZone('UTC'));
     if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
         db()->prepare('DELETE FROM secrets WHERE id = ?')->execute([$id]);
+        $wait();
         json_response(['error' => 'Secret not found or expired'], 404);
     }
 
@@ -311,6 +331,7 @@ if ($method === 'GET' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m)) 
         db()->prepare('DELETE FROM secrets WHERE id = ?')->execute([$id]);
     }
 
+    $wait();
     json_response([
         'id'        => $secret['id'],
         'content'   => $secret['content'],
@@ -333,6 +354,7 @@ if ($method === 'DELETE' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m
 
 // GET /s/{id} — Show/decrypt secret page
 if ($method === 'GET' && preg_match('#^/s/([0-9a-f-]+)$#i', $uri, $m)) {
+    $wait = timing_safe();
     $id = $m[1];
 
     // Check if secret exists (don't leak content — the JS will fetch via API)
@@ -341,10 +363,12 @@ if ($method === 'GET' && preg_match('#^/s/([0-9a-f-]+)$#i', $uri, $m)) {
     $exists = $stmt->fetch();
 
     if (!$exists) {
+        $wait();
         http_response_code(404);
         render('404', ['title' => 'Not Found']);
     }
 
+    $wait();
     render('show', [
         'title'       => 'Secret',
         'id'          => $id,
@@ -360,13 +384,13 @@ if ($method === 'GET' && preg_match('#^/s/([0-9a-f-]+)$#i', $uri, $m)) {
 if ($method === 'POST' && $uri === '/api/request') {
     $input = json_decode(file_get_contents('php://input'), true);
 
-    // Password is always required to create requests
+    // Password is always required to create requests (constant-time comparison)
     $requiredPass = env('NEW_ITEM_PASSWORD');
     if ($requiredPass === '') {
         json_response(['error' => 'NEW_ITEM_PASSWORD must be set to use requests'], 400);
     }
     $givenPass = $input['password'] ?? '';
-    if ($givenPass !== $requiredPass) {
+    if (!hash_equals($requiredPass, $givenPass)) {
         json_response(['error' => 'Password Incorrect'], 401);
     }
 
@@ -384,12 +408,14 @@ if ($method === 'POST' && $uri === '/api/request') {
 
 // GET /r/{token} — Show the request form (for the recipient)
 if ($method === 'GET' && preg_match('#^/r/([0-9a-f]+)$#i', $uri, $m)) {
+    $wait = timing_safe();
     $token = $m[1];
     $stmt = db()->prepare('SELECT * FROM requests WHERE token = ?');
     $stmt->execute([$token]);
     $req = $stmt->fetch();
 
     if (!$req || $req['used']) {
+        $wait();
         http_response_code(404);
         render('404', ['title' => 'Not Found']);
     }
@@ -398,10 +424,12 @@ if ($method === 'GET' && preg_match('#^/r/([0-9a-f]+)$#i', $uri, $m)) {
     $expires = new DateTime($req['expires'], new DateTimeZone('UTC'));
     if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
         db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$req['id']]);
+        $wait();
         http_response_code(404);
         render('404', ['title' => 'Not Found']);
     }
 
+    $wait();
     render('request', [
         'title' => 'Send a Secret',
         'token' => $token,
@@ -411,6 +439,7 @@ if ($method === 'GET' && preg_match('#^/r/([0-9a-f]+)$#i', $uri, $m)) {
 
 // POST /api/request/{token}/submit — Submit a secret via a request token (no password needed)
 if ($method === 'POST' && preg_match('#^/api/request/([0-9a-f]+)/submit$#i', $uri, $m)) {
+    $wait = timing_safe();
     $token = $m[1];
 
     // Validate the request token
@@ -419,12 +448,14 @@ if ($method === 'POST' && preg_match('#^/api/request/([0-9a-f]+)/submit$#i', $ur
     $req = $stmt->fetch();
 
     if (!$req || $req['used']) {
+        $wait();
         json_response(['error' => 'Request not found or already used'], 404);
     }
 
     $expires = new DateTime($req['expires'], new DateTimeZone('UTC'));
     if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
         db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$req['id']]);
+        $wait();
         json_response(['error' => 'Request has expired'], 410);
     }
 
