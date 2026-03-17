@@ -1,10 +1,3 @@
-/vendor
-/.idea
-Homestead.json
-Homestead.yaml
 .env
-.phpunit.result.cache
-/database/database.sqlite
-node_modules
+data/
 .DS_Store
-*.sh
