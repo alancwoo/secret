@@ -1,0 +1,94 @@
+<?php $layout = true; ?>
+
+<div id="loading" class="msg-center">
+  <div class="pulse">Decrypting...</div>
+</div>
+
+<div id="text-result" class="hidden">
+  <p class="msg-warning mb-lg">This message has already been deleted from the server and cannot be retrieved again. Please save the contents securely before closing the browser.</p>
+  <div id="secret-text" class="secret-content"></div>
+</div>
+
+<div id="file-result" class="hidden">
+  <p class="msg-warning mb-lg">This file has already been deleted from the server and cannot be retrieved again. Please download it before closing the browser.</p>
+  <div class="msg-center">
+    <div id="dl-filename" class="bold mb-md"></div>
+    <div id="dl-mimetype" class="file-meta mb-lg"></div>
+    <a id="dl-link" class="btn btn-download" download>Download File</a>
+  </div>
+</div>
+
+<div id="show-error" class="hidden">
+  <p class="msg-error msg-center"></p>
+  <img src="/images/cliparts/<?= rand(1, 16) ?>.jpg" class="error-image" alt="">
+</div>
+
+<script>
+(function () {
+  var id = <?= json_encode($id) ?>;
+  var key = location.hash.substring(1);
+  var allowedTags = <?= json_encode(explode(',', $allowedTags ?? 'br,a')) ?>;
+
+  if (!Secret.isSecureContext()) {
+    showError('Decryption requires HTTPS. Please access this site over HTTPS.');
+    return;
+  }
+
+  if (!key) {
+    showError('No decryption key provided in URL fragment.');
+    return;
+  }
+
+  fetchAndDecrypt();
+
+  async function fetchAndDecrypt() {
+    try {
+      var response = await fetch('/api/secret/' + id);
+      if (!response.ok) throw new Error('Not found');
+      var data = await response.json();
+
+      var decryptionKey = await Secret.importKey(key);
+      var encryptedData = Secret.base64ToArrayBuffer(data.content);
+      var iv = Secret.base64ToArrayBuffer(data.iv);
+      var decrypted = await Secret.decrypt(encryptedData, decryptionKey, iv);
+
+      // Delete from server immediately
+      fetch('/api/secret/' + id, { method: 'DELETE' });
+
+      document.getElementById('loading').classList.add('hidden');
+
+      if (data.isFile) {
+        var filename = data.filename || 'download';
+        var mimetype = data.mimetype || 'application/octet-stream';
+        var blob = new Blob([decrypted], { type: mimetype });
+        var url = URL.createObjectURL(blob);
+
+        document.getElementById('dl-filename').textContent = filename;
+        document.getElementById('dl-mimetype').textContent = mimetype;
+        var link = document.getElementById('dl-link');
+        link.href = url;
+        link.download = filename;
+        document.getElementById('file-result').classList.remove('hidden');
+      } else {
+        var decoded = new TextDecoder().decode(new Uint8Array(decrypted));
+        var sanitized = Secret.sanitize(decoded.replace(/\n/g, '<br>'), allowedTags);
+        document.getElementById('secret-text').innerHTML = sanitized;
+        document.getElementById('text-result').classList.remove('hidden');
+      }
+
+      window.onbeforeunload = function () { return true; };
+
+    } catch (e) {
+      console.error(e);
+      showError('The message does not exist, expired, or the key is incorrect. Please try again.');
+    }
+  }
+
+  function showError(msg) {
+    document.getElementById('loading').classList.add('hidden');
+    var el = document.getElementById('show-error');
+    el.querySelector('p').textContent = msg;
+    el.classList.remove('hidden');
+  }
+})();
+</script>

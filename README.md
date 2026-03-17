@@ -1,42 +1,76 @@
-# 🔒 Secret
-A simple php ([lumen](https://lumen.laravel.com)) app for sharing sensitive text (basically like [onetimesecret](https://onetimesecret.com)), but with full end-to-end AES-256-GCM encryption so even the server has no access to the data, and developed with very simple deployment in mind.
+# Secret
+
+A minimal PHP app for sharing sensitive text and files (like [onetimesecret](https://onetimesecret.com)), with full end-to-end AES-256-GCM encryption. The server never sees plaintext data as it is encrypted by a client-side key. Zero framework dependencies and incredibly simple to deploy.
 
 ![Screenshot](screenshot.png)
 
 ## What is it for
-I often need to send credentials or sensitive information to clients and colleagues and really prefer not to send these things over email/chat where they remain forever prone to breaches and also attached to a context in email threads (eg, it is clear such data is connected to a site/identity/account).
 
-It is even better to send the URL and the KEY separately through different channels and instruct the user to recombine them in the address bar.
+Send credentials or sensitive information to clients and colleagues without it sitting forever in email/chat threads prone to breaches.
+
+Secrets are encrypted client-side, viewed once, then deleted. For increased security, send the URL and KEY separately through different channels.
+
+## Features
+
+- End-to-end AES-256-GCM encryption (Web Crypto API)
+- Text and file sharing (up to 10MB)
+- Configurable expiry (5 minutes to 7 days)
+- Auto-delete after viewing
+- No framework, no Composer, no vendor directory
+- SQLite database (auto-created)
+- Deploy by uploading files to any PHP host
 
 ## Requirements
-- Requires PHP7.x (Lumen does not seem to support PHP8 yet)
-- [Must be hosted/served over https with a proper certificate](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
+
+- PHP 8.0+ with PDO SQLite extension
+- `mod_rewrite` (Apache) or equivalent URL rewriting
+- [HTTPS with a proper certificate](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto) (required for Web Crypto API)
 
 ## Install
-- Clone the repo
-- Copy `.env.example` to `.env`
-- Configure `APP_URL` with the url, `APP_KEY` with a random string, `NEW_ITEM_PASSWORD` with a password for the creation of new items. (Highly recommended, see [Why set a password](#why-set-a-password)).
-- If desired, adjust `ALLOWED_TAGS` as a comma separated list `br,a,img`
-- `touch database/database.sqlite`
-- `composer install`
-- `php artisan migrate`
 
-## Dev
-- `composer install`
-- `npm i`
-- Set URL in `webpack.mix.js`
-- `npx mix watch`
-- Build for production with `npx mix --production`
+1. Clone the repo
+2. Copy `.env.example` to `.env`
+3. Configure `NEW_ITEM_PASSWORD` (recommended — see [Why set a password?](#why-set-a-password))
+4. Point your web server's document root to the `public/` directory
+5. That's it. The SQLite database is created automatically on first request.
+
+## Deploy
+
+Upload these to your server:
+
+```
+public/       <- document root
+views/
+.env
+```
+
+No `composer install`. No `npm install`. No build step. No dependencies at all.
+
+## Customising
+
+- **Logo/header**: Replace `public/images/header.png` with your own image.
+- **Colours, fonts, spacing**: Edit the CSS custom properties at the top of `public/css/app.css`.
+- **Client-side logic**: Edit `public/js/app.js` directly.
+
+No build step required.
+
+## Routes
+
+| Method | URL | Purpose |
+|--------|-----|---------|
+| `GET` | `/` | Create secret form |
+| `POST` | `/api/secret` | Create a new secret (JSON) |
+| `GET` | `/s/{id}` | View/decrypt secret page |
+| `GET` | `/api/secret/{id}` | Fetch encrypted data (JSON) |
+| `DELETE` | `/api/secret/{id}` | Delete a secret |
 
 ## Why Set a Password?
-- A password is highly recommended. If no password is set, anyone can create secrets
-- There's no rate limiter, so without a password a troll could hammer the endpoint to create secrets
-- There's no CSRF protection, though an irrelevant vector since without a password, anyone can create secrets anyways
-- Sanitization can't be performed server-side since the data is e2e encrypted, a sanitization occurs (as per the `ALLOWED_TAGS` environment variable) before displaying the secret. An unlikely vector, since it is sanitized before display, but worth mentioning.
 
-## Notes
-- Not tested on IE/Edge, but from a look at the [Compatibility table](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto#browser_compatibility) the requirements should be supported
-- Thank you [Pichiste](https://github.com/pichiste) for helping debug the nightmare of SubtleCrypto ArrayBuffer <> String conversions.
+- Without a password, anyone can create secrets
+- There's no rate limiter, so a troll could hammer the endpoint
+- There's no CSRF protection (irrelevant without a password since anyone can create secrets anyway)
+- Sanitization is performed client-side before display (configured via `ALLOWED_TAGS` env var) since the server only sees encrypted data
 
 ## License
+
 [GNU General Public License version 2](https://opensource.org/licenses/GPL-2.0)
