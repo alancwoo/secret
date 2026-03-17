@@ -14,8 +14,8 @@ Secrets are encrypted client-side, viewed once, then deleted. For increased secu
 
 - End-to-end AES-256-GCM encryption (Web Crypto API)
 - Text and file sharing (up to 10MB)
-- Configurable expiry (5 minutes to 7 days)
-- Auto-delete after viewing
+- Configurable expiry (5 minutes to 7 days, or unlimited)
+- Configurable view limit (1, 3, 5, 10, or unlimited views)
 - No framework, no Composer, no vendor directory
 - SQLite database (auto-created)
 - Deploy by uploading files to any PHP host
@@ -70,6 +70,14 @@ No build step required.
 - There's no rate limiter, so a troll could hammer the endpoint
 - There's no CSRF protection (irrelevant without a password since anyone can create secrets anyway)
 - Sanitization is performed client-side before display (configured via `ALLOWED_TAGS` env var) since the server only sees encrypted data
+
+## Tests
+
+```bash
+php tests/run.php
+```
+
+Runs 83 tests covering the API, view counting, expiry, file uploads, static assets, password protection, input validation, and error handling. Uses a temporary database — safe to run against a live install.
 
 ## License
 

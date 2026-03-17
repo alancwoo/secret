@@ -5,12 +5,12 @@
 </div>
 
 <div id="text-result" class="hidden">
-  <p class="msg-warning mb-lg">This message has already been deleted from the server and cannot be retrieved again. Please save the contents securely before closing the browser.</p>
+  <p id="text-warning" class="msg-warning mb-lg"></p>
   <div id="secret-text" class="secret-content"></div>
 </div>
 
 <div id="file-result" class="hidden">
-  <p class="msg-warning mb-lg">This file has already been deleted from the server and cannot be retrieved again. Please download it before closing the browser.</p>
+  <p id="file-warning" class="msg-warning mb-lg"></p>
   <div class="msg-center">
     <div id="dl-filename" class="bold mb-md"></div>
     <div id="dl-mimetype" class="file-meta mb-lg"></div>
@@ -52,8 +52,17 @@
       var iv = Secret.base64ToArrayBuffer(data.iv);
       var decrypted = await Secret.decrypt(encryptedData, decryptionKey, iv);
 
-      // Delete from server immediately
-      fetch('/api/secret/' + id, { method: 'DELETE' });
+      // Build warning message based on view limits
+      var lastView = data.lastView;
+      var warningMsg;
+      if (lastView) {
+        warningMsg = 'This has been deleted from the server and cannot be retrieved again. Please save the contents securely before closing the browser.';
+      } else if (data.maxViews === 0) {
+        warningMsg = 'View ' + data.views + ' — this secret has no view limit and will expire by time only.';
+      } else {
+        var remaining = data.maxViews - data.views;
+        warningMsg = 'View ' + data.views + ' of ' + data.maxViews + '. ' + remaining + ' view' + (remaining === 1 ? '' : 's') + ' remaining before deletion.';
+      }
 
       document.getElementById('loading').classList.add('hidden');
 
@@ -63,6 +72,7 @@
         var blob = new Blob([decrypted], { type: mimetype });
         var url = URL.createObjectURL(blob);
 
+        document.getElementById('file-warning').textContent = warningMsg;
         document.getElementById('dl-filename').textContent = filename;
         document.getElementById('dl-mimetype').textContent = mimetype;
         var link = document.getElementById('dl-link');
@@ -72,11 +82,14 @@
       } else {
         var decoded = new TextDecoder().decode(new Uint8Array(decrypted));
         var sanitized = Secret.sanitize(decoded.replace(/\n/g, '<br>'), allowedTags);
+        document.getElementById('text-warning').textContent = warningMsg;
         document.getElementById('secret-text').innerHTML = sanitized;
         document.getElementById('text-result').classList.remove('hidden');
       }
 
-      window.onbeforeunload = function () { return true; };
+      if (lastView) {
+        window.onbeforeunload = function () { return true; };
+      }
 
     } catch (e) {
       console.error(e);

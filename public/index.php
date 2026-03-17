@@ -47,11 +47,11 @@ if ($requestPath !== '/' && $requestPath !== '') {
 
 define('ROOT_DIR', dirname(__DIR__));
 define('VIEWS_DIR', ROOT_DIR . '/views');
-define('DB_PATH', ROOT_DIR . '/data/secrets.db');
+define('DB_PATH', getenv('DB_PATH') ?: ROOT_DIR . '/data/secrets.db');
 define('MAX_CONTENT_SIZE', 15 * 1024 * 1024); // 15MB (base64 overhead for ~10MB file)
 
 // Load .env file
-$envFile = ROOT_DIR . '/.env';
+$envFile = getenv('ENV_FILE') ?: ROOT_DIR . '/.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
@@ -103,8 +103,19 @@ function db(): PDO {
         filename   TEXT,
         mimetype   TEXT,
         expires    TEXT NOT NULL,
+        max_views  INTEGER NOT NULL DEFAULT 1,
+        views      INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL
     )');
+
+    // Migrate: add max_views and views columns if missing
+    $cols = array_column($pdo->query('PRAGMA table_info(secrets)')->fetchAll(), 'name');
+    if (!in_array('max_views', $cols)) {
+        $pdo->exec('ALTER TABLE secrets ADD COLUMN max_views INTEGER NOT NULL DEFAULT 1');
+    }
+    if (!in_array('views', $cols)) {
+        $pdo->exec('ALTER TABLE secrets ADD COLUMN views INTEGER NOT NULL DEFAULT 0');
+    }
 
     return $pdo;
 }
@@ -151,17 +162,19 @@ function render(string $view, array $data = []): void {
 
 /**
  * Calculate expiry datetime from an ISO 8601 duration-style code.
- * Accepts: T5M, T1H, T12H, 1D, 3D, 7D
+ * Accepts: T5M, T1H, T12H, 1D, 3D, 7D, never
+ * "never" returns a date 100 years from now (effectively unlimited).
  */
 function calculate_expiry(string $code): string {
     $now = new DateTime('now', new DateTimeZone('UTC'));
     $map = [
-        'T5M'  => 'PT5M',
-        'T1H'  => 'PT1H',
-        'T12H' => 'PT12H',
-        '1D'   => 'P1D',
-        '3D'   => 'P3D',
-        '7D'   => 'P7D',
+        'T5M'   => 'PT5M',
+        'T1H'   => 'PT1H',
+        'T12H'  => 'PT12H',
+        '1D'    => 'P1D',
+        '3D'    => 'P3D',
+        '7D'    => 'P7D',
+        'never' => 'P100Y',
     ];
     $interval = $map[$code] ?? 'P1D';
     $now->add(new DateInterval($interval));
@@ -226,13 +239,15 @@ if ($method === 'POST' && $uri === '/api/secret') {
         }
     }
 
-    $id      = uuid();
-    $expires = calculate_expiry($input['expires'] ?? '1D');
-    $isFile  = !empty($input['isFile']) ? 1 : 0;
+    $id       = uuid();
+    $expires  = calculate_expiry($input['expires'] ?? '1D');
+    $isFile   = !empty($input['isFile']) ? 1 : 0;
+    $maxViews = intval($input['maxViews'] ?? 1);
+    if ($maxViews < 0) $maxViews = 0; // 0 = unlimited
 
     $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
-    $stmt = db()->prepare('INSERT INTO secrets (id, content, iv, is_file, filename, mimetype, expires, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    $stmt = db()->prepare('INSERT INTO secrets (id, content, iv, is_file, filename, mimetype, expires, max_views, views, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)');
     $stmt->execute([
         $id,
         $input['content'],
@@ -241,6 +256,7 @@ if ($method === 'POST' && $uri === '/api/secret') {
         $isFile ? ($input['filename'] ?? null) : null,
         $isFile ? ($input['mimetype'] ?? null) : null,
         $expires,
+        $maxViews,
         $now,
     ]);
 
@@ -265,13 +281,28 @@ if ($method === 'GET' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m)) 
         json_response(['error' => 'Secret not found or expired'], 404);
     }
 
+    // Increment view count
+    $newViews = (int)$secret['views'] + 1;
+    $maxViews = (int)$secret['max_views'];
+    db()->prepare('UPDATE secrets SET views = ? WHERE id = ?')->execute([$newViews, $id]);
+
+    // If this view exhausts the limit, delete the secret
+    // (max_views=0 means unlimited — only time expiry applies)
+    $lastView = ($maxViews > 0 && $newViews >= $maxViews);
+    if ($lastView) {
+        db()->prepare('DELETE FROM secrets WHERE id = ?')->execute([$id]);
+    }
+
     json_response([
-        'id'       => $secret['id'],
-        'content'  => $secret['content'],
-        'iv'       => $secret['iv'],
-        'isFile'   => (bool)$secret['is_file'],
-        'filename' => $secret['filename'],
-        'mimetype' => $secret['mimetype'],
+        'id'        => $secret['id'],
+        'content'   => $secret['content'],
+        'iv'        => $secret['iv'],
+        'isFile'    => (bool)$secret['is_file'],
+        'filename'  => $secret['filename'],
+        'mimetype'  => $secret['mimetype'],
+        'lastView'  => $lastView,
+        'views'     => $newViews,
+        'maxViews'  => $maxViews,
     ]);
 }
 

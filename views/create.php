@@ -37,7 +37,7 @@
 
     <div class="form-row">
       <div>
-        <label for="expires">Expires</label>
+        <label for="expires">Time Expiry</label>
         <select id="expires">
           <option value="T5M">5 Minutes</option>
           <option value="T1H">1 Hour</option>
@@ -45,14 +45,28 @@
           <option value="1D">1 Day</option>
           <option value="3D">3 Days</option>
           <option value="7D">7 Days</option>
+          <option value="never">Unlimited</option>
         </select>
-        <p class="form-hint">Secret will always be deleted after viewing</p>
+        <p class="form-hint">Secret expires after...</p>
+      </div>
+
+      <div>
+        <label for="max-views">Max Views</label>
+        <select id="max-views">
+          <option value="1">1 view</option>
+          <option value="3">3 views</option>
+          <option value="5">5 views</option>
+          <option value="10">10 views</option>
+          <option value="0">Unlimited</option>
+        </select>
+        <p class="form-hint">Secret will be deleted after this many views</p>
       </div>
 
       <?php if ($requirePassword): ?>
       <div>
-        <label for="password">Password</label>
+        <label for="password">Upload Password</label>
         <input id="password" type="password" placeholder="******************" required>
+        <p class="form-hint">Password to create a new secret</p>
       </div>
       <?php endif; ?>
     </div>
@@ -82,7 +96,7 @@
   </div>
 
   <div class="mt-lg">
-    <p>This link expires in <span id="result-expiry" class="bold"></span>, and can only be viewed once.</p>
+    <p id="result-summary"></p>
     <p class="mt-sm"><button class="delete-link" onclick="deleteCreatedSecret()">Click here to delete it immediately</button></p>
   </div>
 </div>
@@ -98,7 +112,7 @@
 
   var expiryLabels = {
     'T5M': '5 Minutes', 'T1H': '1 Hour', 'T12H': '12 Hours',
-    '1D': '1 Day', '3D': '3 Days', '7D': '7 Days'
+    '1D': '1 Day', '3D': '3 Days', '7D': '7 Days', 'never': 'Never'
   };
 
   // Expose to inline handlers
@@ -224,6 +238,7 @@
         content: Secret.arrayBufferToBase64(encrypted),
         iv: Secret.arrayBufferToBase64(iv),
         expires: document.getElementById('expires').value,
+        maxViews: parseInt(document.getElementById('max-views').value, 10),
         password: document.getElementById('password') ? document.getElementById('password').value : '',
         isFile: contentType === 'file'
       };
@@ -266,11 +281,27 @@
     var url = location.origin + '/s/' + createdId;
     var full = url + '#' + createdKey;
     var expiresVal = document.getElementById('expires').value;
+    var maxViewsVal = parseInt(document.getElementById('max-views').value, 10);
 
     document.getElementById('result-full-url').textContent = full;
     document.getElementById('result-url').textContent = url;
     document.getElementById('result-key').textContent = '#' + createdKey;
-    document.getElementById('result-expiry').textContent = expiryLabels[expiresVal] || expiresVal;
+
+    // Build summary
+    var parts = [];
+    if (expiresVal === 'never') {
+      parts.push('This link has no time expiry');
+    } else {
+      parts.push('This link expires in ' + (expiryLabels[expiresVal] || expiresVal));
+    }
+    if (maxViewsVal === 0) {
+      parts.push('can be viewed unlimited times');
+    } else if (maxViewsVal === 1) {
+      parts.push('can only be viewed once');
+    } else {
+      parts.push('can be viewed ' + maxViewsVal + ' times');
+    }
+    document.getElementById('result-summary').textContent = parts.join(', and ') + '.';
 
     document.getElementById('create-form').classList.add('hidden');
     document.getElementById('result').classList.remove('hidden');
