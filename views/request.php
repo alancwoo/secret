@@ -27,7 +27,7 @@
       <div id="dropzone" class="dropzone" onclick="document.getElementById('file-picker').click()">
         <input type="file" id="file-picker" onchange="handleFileSelect(this)">
         <div id="dropzone-prompt">
-          <div>Drop a file here or click to select</div>
+          <div>Drop, paste, or click to select a file</div>
           <div class="form-hint">Max 10MB</div>
         </div>
         <div id="dropzone-info" class="hidden">
@@ -111,15 +111,15 @@
     document.getElementById('file-input').classList.toggle('hidden', type !== 'file');
   };
 
-  window.handleFileSelect = function (input) {
-    var file = input.files[0];
+  var MAX_FILE = 10 * 1024 * 1024;
+
+  function acceptFile(file) {
     if (!file) return;
-    var MAX = 10 * 1024 * 1024;
-    if (file.size > MAX) {
-      showError('File size exceeds limit (max ' + Secret.formatFileSize(MAX) + ')');
-      input.value = '';
+    if (file.size > MAX_FILE) {
+      showError('File size exceeds limit (max ' + Secret.formatFileSize(MAX_FILE) + ')');
       return;
     }
+    hideError();
     selectedFile = file;
     document.getElementById('file-name').textContent = file.name;
     document.getElementById('file-size').textContent = Secret.formatFileSize(file.size);
@@ -131,6 +131,16 @@
     var reader = new FileReader();
     reader.onload = function (e) { fileData = e.target.result; };
     reader.readAsArrayBuffer(file);
+  }
+
+  function switchToFile() {
+    contentType = 'file';
+    document.querySelector('input[name="content_type"][value="file"]').checked = true;
+    window.toggleType('file');
+  }
+
+  window.handleFileSelect = function (input) {
+    acceptFile(input.files[0]);
   };
 
   window.removeFile = function () {
@@ -149,11 +159,24 @@
     e.preventDefault();
     dz.classList.remove('dragover');
     if (e.dataTransfer.files.length) {
-      contentType = 'file';
-      document.querySelector('input[name="content_type"][value="file"]').checked = true;
-      window.toggleType('file');
-      document.getElementById('file-picker').files = e.dataTransfer.files;
-      window.handleFileSelect(document.getElementById('file-picker'));
+      switchToFile();
+      acceptFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  document.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        e.preventDefault();
+        var file = items[i].getAsFile();
+        if (file) {
+          switchToFile();
+          acceptFile(file);
+        }
+        return;
+      }
     }
   });
 
