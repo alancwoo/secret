@@ -127,6 +127,16 @@ function db(): PDO {
         created_at TEXT NOT NULL
     )');
 
+    // Links table for URL shortener (plain-text, no encryption)
+    $pdo->exec('CREATE TABLE IF NOT EXISTS links (
+        id         TEXT PRIMARY KEY,
+        url        TEXT NOT NULL,
+        expires    TEXT NOT NULL,
+        max_views  INTEGER NOT NULL DEFAULT 0,
+        views      INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+    )');
+
     return $pdo;
 }
 
@@ -198,6 +208,7 @@ function cleanup_expired(): void {
     $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
     db()->prepare('DELETE FROM secrets WHERE expires < ?')->execute([$now]);
     db()->prepare('DELETE FROM requests WHERE expires < ?')->execute([$now]);
+    db()->prepare('DELETE FROM links WHERE expires < ?')->execute([$now]);
 }
 
 /**
@@ -205,6 +216,25 @@ function cleanup_expired(): void {
  */
 function random_token(int $length = 32): string {
     return bin2hex(random_bytes($length / 2));
+}
+
+/**
+ * Generate a short unambiguous ID for shortened links (e.g. "a3F").
+ * Uses a 50-char alphabet that omits visually confusing characters
+ * (0, O, 1, l, I). Retries on collision.
+ */
+function short_link_id(int $length = 3): string {
+    $chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    $n = strlen($chars);
+    do {
+        $id = '';
+        for ($i = 0; $i < $length; $i++) {
+            $id .= $chars[random_int(0, $n - 1)];
+        }
+        $stmt = db()->prepare('SELECT id FROM links WHERE id = ?');
+        $stmt->execute([$id]);
+    } while ($stmt->fetch());
+    return $id;
 }
 
 /**
@@ -495,6 +525,187 @@ if ($method === 'POST' && preg_match('#^/api/request/([0-9a-f]+)/submit$#i', $ur
     db()->prepare('UPDATE requests SET used = 1 WHERE id = ?')->execute([$req['id']]);
 
     json_response(['id' => $id], 201);
+}
+
+// ---------------------------------------------------------------------------
+// Admin panel
+// ---------------------------------------------------------------------------
+
+// GET /admin — Admin panel page
+if ($method === 'GET' && $uri === '/admin') {
+    if (env('NEW_ITEM_PASSWORD') === '') {
+        http_response_code(404);
+        render('404', ['title' => 'Not Found']);
+    }
+    render('admin', ['title' => 'Admin']);
+}
+
+// POST /api/admin — Return all items (requires password)
+if ($method === 'POST' && $uri === '/api/admin') {
+    $wait = timing_safe();
+    $input = json_decode(file_get_contents('php://input'), true);
+    $requiredPass = env('NEW_ITEM_PASSWORD');
+    if ($requiredPass === '') {
+        $wait();
+        json_response(['error' => 'Admin not available'], 404);
+    }
+    $givenPass = $input['password'] ?? '';
+    if (!hash_equals($requiredPass, $givenPass)) {
+        $wait();
+        json_response(['error' => 'Password Incorrect'], 401);
+    }
+    $secrets  = db()->query('SELECT id, is_file, filename, expires, max_views, views, created_at FROM secrets ORDER BY created_at DESC')->fetchAll();
+    $links    = db()->query('SELECT id, url, expires, max_views, views, created_at FROM links ORDER BY created_at DESC')->fetchAll();
+    $requests = db()->query('SELECT id, label, used, expires, created_at FROM requests ORDER BY created_at DESC')->fetchAll();
+    $wait();
+    json_response(['secrets' => $secrets, 'links' => $links, 'requests' => $requests]);
+}
+
+// DELETE /api/request/{id} — Delete a request
+if ($method === 'DELETE' && preg_match('#^/api/request/([0-9a-f-]+)$#i', $uri, $m)) {
+    $id = $m[1];
+    db()->prepare('DELETE FROM requests WHERE id = ?')->execute([$id]);
+    json_response(['deleted' => true]);
+}
+
+// ---------------------------------------------------------------------------
+// URL Shortener — plain-text redirect links (no encryption)
+// ---------------------------------------------------------------------------
+
+// POST /api/link — Create a shortened link
+if ($method === 'POST' && $uri === '/api/link') {
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    if (!$input || empty($input['url'])) {
+        json_response(['error' => 'Missing required fields'], 400);
+    }
+
+    $url = filter_var(trim($input['url']), FILTER_VALIDATE_URL);
+    if (!$url || !in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'])) {
+        json_response(['error' => 'Invalid URL — must start with http:// or https://'], 400);
+    }
+
+    $requiredPass = env('NEW_ITEM_PASSWORD');
+    if ($requiredPass !== '') {
+        $givenPass = $input['password'] ?? '';
+        if (!hash_equals($requiredPass, $givenPass)) {
+            json_response(['error' => 'Password Incorrect'], 401);
+        }
+    }
+
+    $id       = short_link_id();
+    $expires  = calculate_expiry($input['expires'] ?? '1D');
+    $maxViews = intval($input['maxViews'] ?? 0);
+    if ($maxViews < 0) $maxViews = 0;
+
+    $now = (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s\Z');
+    $stmt = db()->prepare('INSERT INTO links (id, url, expires, max_views, views, created_at) VALUES (?, ?, ?, ?, 0, ?)');
+    $stmt->execute([$id, $url, $expires, $maxViews, $now]);
+
+    json_response(['id' => $id], 201);
+}
+
+// DELETE /api/link/{id} — Delete a link
+if ($method === 'DELETE' && preg_match('#^/api/link/([a-zA-Z0-9]+)$#', $uri, $m)) {
+    $id = $m[1];
+    db()->prepare('DELETE FROM links WHERE id = ?')->execute([$id]);
+    json_response(['deleted' => true]);
+}
+
+// GET /l/{id} — Redirect to the shortened URL
+if ($method === 'GET' && preg_match('#^/l/([a-zA-Z0-9]+)$#', $uri, $m)) {
+    $id   = $m[1];
+    $stmt = db()->prepare('SELECT * FROM links WHERE id = ?');
+    $stmt->execute([$id]);
+    $link = $stmt->fetch();
+
+    if (!$link) {
+        http_response_code(404);
+        render('404', ['title' => 'Not Found']);
+    }
+
+    $expires = new DateTime($link['expires'], new DateTimeZone('UTC'));
+    if (new DateTime('now', new DateTimeZone('UTC')) > $expires) {
+        db()->prepare('DELETE FROM links WHERE id = ?')->execute([$id]);
+        http_response_code(404);
+        render('404', ['title' => 'Not Found']);
+    }
+
+    $newViews = (int)$link['views'] + 1;
+    $maxViews = (int)$link['max_views'];
+    db()->prepare('UPDATE links SET views = ? WHERE id = ?')->execute([$newViews, $id]);
+
+    if ($maxViews > 0 && $newViews >= $maxViews) {
+        db()->prepare('DELETE FROM links WHERE id = ?')->execute([$id]);
+    }
+
+    header('Location: ' . $link['url'], true, 302);
+    exit;
+}
+
+// PATCH /api/secret/{id} — Update expiry / max views
+if ($method === 'PATCH' && preg_match('#^/api/secret/([0-9a-f-]+)$#i', $uri, $m)) {
+    $id    = $m[1];
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $requiredPass = env('NEW_ITEM_PASSWORD');
+    if ($requiredPass !== '') {
+        if (!hash_equals($requiredPass, $input['password'] ?? '')) {
+            json_response(['error' => 'Password Incorrect'], 401);
+        }
+    }
+
+    $sets = []; $params = [];
+    if (isset($input['expires'])) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $input['expires'])) {
+            json_response(['error' => 'Invalid expires format'], 400);
+        }
+        $sets[] = 'expires = ?'; $params[] = $input['expires'];
+    }
+    if (isset($input['maxViews'])) {
+        $mv = max(0, intval($input['maxViews']));
+        $sets[] = 'max_views = ?'; $params[] = $mv;
+    }
+    if (!$sets) json_response(['error' => 'Nothing to update'], 400);
+    $params[] = $id;
+    db()->prepare('UPDATE secrets SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+    json_response(['updated' => true]);
+}
+
+// PATCH /api/link/{id} — Update url / expiry / max views
+if ($method === 'PATCH' && preg_match('#^/api/link/([a-zA-Z0-9]+)$#', $uri, $m)) {
+    $id    = $m[1];
+    $input = json_decode(file_get_contents('php://input'), true);
+
+    $requiredPass = env('NEW_ITEM_PASSWORD');
+    if ($requiredPass !== '') {
+        if (!hash_equals($requiredPass, $input['password'] ?? '')) {
+            json_response(['error' => 'Password Incorrect'], 401);
+        }
+    }
+
+    $sets = []; $params = [];
+    if (isset($input['url'])) {
+        $url = filter_var(trim($input['url']), FILTER_VALIDATE_URL);
+        if (!$url || !in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'])) {
+            json_response(['error' => 'Invalid URL'], 400);
+        }
+        $sets[] = 'url = ?'; $params[] = $url;
+    }
+    if (isset($input['expires'])) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $input['expires'])) {
+            json_response(['error' => 'Invalid expires format'], 400);
+        }
+        $sets[] = 'expires = ?'; $params[] = $input['expires'];
+    }
+    if (isset($input['maxViews'])) {
+        $mv = max(0, intval($input['maxViews']));
+        $sets[] = 'max_views = ?'; $params[] = $mv;
+    }
+    if (!$sets) json_response(['error' => 'Nothing to update'], 400);
+    $params[] = $id;
+    db()->prepare('UPDATE links SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+    json_response(['updated' => true]);
 }
 
 // ---------------------------------------------------------------------------

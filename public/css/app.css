@@ -79,11 +79,15 @@ hr       { border: none; border-top: 1px solid var(--color-border); }
   height: auto;
 }
 
+.header-img-dark { display: none; }
+
 
 /* === Form elements === */
 
 textarea,
 input[type="text"],
+input[type="url"],
+input[type="datetime-local"],
 input[type="password"],
 select {
   display: block;
@@ -274,6 +278,7 @@ label {
   background: none;
   border: none;
   font: inherit;
+  font-size: var(--font-size-xs);
   padding: 0;
 }
 
@@ -361,6 +366,194 @@ label {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.3; }
+}
+
+
+/* === Dark mode === */
+
+@media (prefers-color-scheme: dark) {
+  .header-img-light { display: none; }
+  .header-img-dark  { display: block; }
+
+  :root {
+    --color-bg:            #111827;
+    --color-text:          #e5e7eb;
+    --color-text-light:    #6b7280;
+    --color-border:        #374151;
+    --color-input-bg:      #1f2937;
+    --color-input-focus:   #374151;
+    --color-button-hover:  #1f2937;
+    --color-button-border: #9ca3af;
+    --color-highlight:     #713f12;
+    --color-download-bg:   #4b5563;
+    --color-radio-border:  #e5e7eb;
+    --color-radio-checked: #e5e7eb;
+    --color-tab-active:    #e5e7eb;
+    --color-tab-inactive:  #6b7280;
+    --color-progress-bg:   #374151;
+    --color-progress-fill: #9ca3af;
+  }
+}
+
+
+/* === Unsecured notice (URL shortener tab) === */
+
+.notice-unsecured {
+  padding: var(--space-md);
+  border: 1px solid var(--color-text-error);
+  border-radius: var(--border-radius);
+  color: var(--color-text-error);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.notice-unsecured strong {
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+
+/* === Admin panel === */
+
+.admin-section {
+  margin-top: var(--space-xl);
+}
+
+.admin-section + .admin-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-xl);
+}
+
+.admin-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.admin-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+}
+
+.admin-table-wrap { overflow-x: auto; }
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.admin-table th {
+  text-align: left;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: var(--color-text-light);
+  padding: var(--space-xs) var(--space-md) var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: var(--space-sm) var(--space-md) var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-table tr:last-child td { border-bottom: none; }
+
+.admin-table .col-mono {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-light);
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-table .col-url {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-empty {
+  color: var(--color-text-light);
+  font-style: italic;
+  font-size: var(--font-size-sm);
+  padding: var(--space-sm) 0;
+}
+
+.admin-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-lg);
+}
+
+.btn-sm {
+  display: inline-block;
+  width: auto;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-sm);
+  border-width: 2px;
+}
+
+.edit-link {
+  color: var(--color-text-light);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  padding: 0;
+}
+
+.edit-link:hover { color: var(--color-text); }
+
+.edit-row > td {
+  background: var(--color-input-bg);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-end;
+}
+
+.edit-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+  min-width: 130px;
+}
+
+.edit-form-group label { margin-bottom: 0; }
+
+.edit-form-full { flex: 0 0 100%; }
+
+.edit-form-actions {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+  flex-shrink: 0;
+  padding-bottom: 2px;
 }
 
 

@@ -1,14 +1,16 @@
 <?php $layout = true; ?>
 
-<img src="/images/header.png" alt="Secret" class="header-img">
+<img src="/images/header.png" alt="Secret" class="header-img header-img-light">
+<img src="/images/header-dark.png" alt="Secret" class="header-img header-img-dark">
 
 <!-- === Tabs === -->
-<?php if ($requirePassword): ?>
 <div class="tabs">
   <button class="tab active" onclick="switchTab('create')" id="tab-create">Create</button>
+  <button class="tab" onclick="switchTab('shorten')" id="tab-shorten">Shorten</button>
+  <?php if ($requirePassword): ?>
   <button class="tab" onclick="switchTab('request')" id="tab-request">Request</button>
+  <?php endif; ?>
 </div>
-<?php endif; ?>
 
 <!-- ================================================================== -->
 <!-- TAB: Create Secret                                                 -->
@@ -96,22 +98,96 @@
   <div id="result" class="hidden">
     <p class="msg-success">Your secret has been encrypted and saved securely. Please share the link below.</p>
 
-    <div id="result-full-url" class="result-box mt-md" onclick="copyText(this.textContent)"></div>
+    <div id="result-full-url" class="result-box mt-md" onclick="copyText(this)"></div>
     <p class="copy-hint">Click to copy</p>
 
     <div class="mt-lg">
       <p class="msg-success">For increased security you may choose to send the URL and KEY separately (e.g. one by email and another by text)</p>
 
       <p class="section-label">URL</p>
-      <div id="result-url" class="result-box" onclick="copyText(this.textContent)"></div>
+      <div id="result-url" class="result-box" onclick="copyText(this)"></div>
+      <p class="copy-hint">Click to copy</p>
 
       <p class="section-label">Key</p>
-      <div id="result-key" class="result-box" onclick="copyText(this.textContent)"></div>
+      <div id="result-key" class="result-box" onclick="copyText(this)"></div>
+      <p class="copy-hint">Click to copy</p>
     </div>
 
     <div class="mt-lg">
       <p id="result-summary"></p>
       <p class="mt-sm"><button class="delete-link" onclick="deleteCreatedSecret()">Click here to delete it immediately</button></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ================================================================== -->
+<!-- TAB: Shorten a URL                                                 -->
+<!-- ================================================================== -->
+<div id="panel-shorten" class="hidden">
+
+  <div class="notice-unsecured">
+    <strong>NOT SECURE</strong>
+    This acts only as an URL shortener. Do not use this tab for anything sensitive.
+  </div>
+
+  <div id="shorten-form-wrap">
+    <form id="shorten-form" onsubmit="return handleShortenSubmit(event)">
+
+      <div class="form-group">
+        <label for="shorten-url">Destination URL</label>
+        <input id="shorten-url" type="url" placeholder="https://example.com" required>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label for="shorten-expires">Time Expiry</label>
+          <select id="shorten-expires">
+            <option value="T5M">5 Minutes</option>
+            <option value="T1H">1 Hour</option>
+            <option value="T12H">12 Hours</option>
+            <option value="1D" selected>1 Day</option>
+            <option value="3D">3 Days</option>
+            <option value="7D">7 Days</option>
+            <option value="never">Unlimited</option>
+          </select>
+          <p class="form-hint">When the link expires by time</p>
+        </div>
+
+        <div>
+          <label for="shorten-max-views">Max Redirects</label>
+          <select id="shorten-max-views">
+            <option value="1">1 redirect</option>
+            <option value="3">3 redirects</option>
+            <option value="5">5 redirects</option>
+            <option value="10">10 redirects</option>
+            <option value="0" selected>Unlimited</option>
+          </select>
+          <p class="form-hint">Deleted after this many redirects</p>
+        </div>
+
+        <?php if ($requirePassword): ?>
+        <div>
+          <label for="shorten-password">Password</label>
+          <input id="shorten-password" type="password" placeholder="******************" required>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <button class="btn mt-lg" type="submit">Shorten</button>
+    </form>
+  </div>
+
+  <div id="shorten-error" class="hidden mt-lg msg-error"></div>
+
+  <div id="shorten-result" class="hidden mt-lg">
+    <p class="msg-success">Shortened link created.</p>
+    <div id="shorten-result-url" class="result-box mt-md" onclick="copyText(this)"></div>
+    <p class="copy-hint">Click to copy</p>
+
+    <div class="mt-lg">
+      <p id="shorten-result-summary"></p>
+      <p class="mt-sm"><button class="delete-link" onclick="deleteShortenedLink()">Click here to delete it immediately</button></p>
     </div>
   </div>
 
@@ -157,7 +233,7 @@
 
   <div id="request-result" class="hidden mt-lg">
     <p class="msg-success">Request link created. Send this to the person you want a secret from:</p>
-    <div id="request-url" class="result-box mt-md" onclick="copyText(this.textContent)"></div>
+    <div id="request-url" class="result-box mt-md" onclick="copyText(this)"></div>
     <p class="copy-hint">Click to copy</p>
     <p class="form-hint mt-md">This link can only be used once. Once they submit a secret, they'll see a URL and key to send back to you.</p>
   </div>
@@ -170,14 +246,12 @@
   // === Tab switching ===
 
   window.switchTab = function (tab) {
-    document.getElementById('panel-create').classList.toggle('hidden', tab !== 'create');
-    document.getElementById('tab-create').classList.toggle('active', tab === 'create');
-    var panelReq = document.getElementById('panel-request');
-    var tabReq = document.getElementById('tab-request');
-    if (panelReq) {
-      panelReq.classList.toggle('hidden', tab !== 'request');
-      tabReq.classList.toggle('active', tab === 'request');
-    }
+    ['create', 'shorten', 'request'].forEach(function (t) {
+      var panel = document.getElementById('panel-' + t);
+      var btn   = document.getElementById('tab-' + t);
+      if (panel) panel.classList.toggle('hidden', tab !== t);
+      if (btn)   btn.classList.toggle('active', tab === t);
+    });
   };
 
   // === State ===
@@ -187,6 +261,7 @@
   var fileData = null;
   var createdId = null;
   var createdKey = null;
+  var createdLinkId = null;
 
   var expiryLabels = {
     'T5M': '5 Minutes', 'T1H': '1 Hour', 'T12H': '12 Hours',
@@ -289,8 +364,30 @@
     });
   };
 
-  window.copyText = function (text) {
-    if (navigator.clipboard) navigator.clipboard.writeText(text.trim());
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  window.copyText = function (el) {
+    var text = el.textContent.trim();
+    var hint = el.nextElementSibling;
+    function feedback() {
+      if (hint && hint.classList.contains('copy-hint')) {
+        hint.textContent = 'Copied!';
+        setTimeout(function () { hint.textContent = 'Click to copy'; }, 2000);
+      }
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(feedback).catch(function () { fallbackCopy(text); feedback(); });
+    } else {
+      fallbackCopy(text); feedback();
+    }
   };
 
   function showError(msg) {
@@ -437,6 +534,86 @@
 
     document.getElementById('create-form').classList.add('hidden');
     document.getElementById('result').classList.remove('hidden');
+  }
+
+  // === Shorten a URL ===
+
+  window.handleShortenSubmit = function (e) {
+    e.preventDefault();
+    createLink();
+    return false;
+  };
+
+  window.deleteShortenedLink = function () {
+    if (!createdLinkId) return;
+    fetch('/api/link/' + createdLinkId, { method: 'DELETE' }).then(function () {
+      location.reload();
+    });
+  };
+
+  async function createLink() {
+    var errEl = document.getElementById('shorten-error');
+    errEl.classList.add('hidden');
+
+    var url = document.getElementById('shorten-url').value.trim();
+    try {
+      var parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('invalid');
+    } catch (e) {
+      errEl.textContent = 'Please enter a valid http:// or https:// URL';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    var body = {
+      url:      url,
+      expires:  document.getElementById('shorten-expires').value,
+      maxViews: parseInt(document.getElementById('shorten-max-views').value, 10),
+    };
+    var pwEl = document.getElementById('shorten-password');
+    if (pwEl) body.password = pwEl.value;
+
+    try {
+      var response = await fetch('/api/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      var json = await response.json();
+
+      if (response.status === 201) {
+        createdLinkId = json.id;
+        var shortUrl = location.origin + '/l/' + json.id;
+        document.getElementById('shorten-result-url').textContent = shortUrl;
+
+        var expiresVal  = document.getElementById('shorten-expires').value;
+        var maxViewsVal = parseInt(document.getElementById('shorten-max-views').value, 10);
+        var parts = [];
+        if (expiresVal === 'never') {
+          parts.push('This link has no time expiry');
+        } else {
+          parts.push('This link expires in ' + (expiryLabels[expiresVal] || expiresVal));
+        }
+        if (maxViewsVal === 0) {
+          parts.push('can be used unlimited times');
+        } else if (maxViewsVal === 1) {
+          parts.push('can only be used once');
+        } else {
+          parts.push('can be used ' + maxViewsVal + ' times');
+        }
+        document.getElementById('shorten-result-summary').textContent = parts.join(', and ') + '.';
+
+        document.getElementById('shorten-form-wrap').classList.add('hidden');
+        document.getElementById('shorten-result').classList.remove('hidden');
+      } else {
+        errEl.textContent = json.error || 'An error occurred';
+        errEl.classList.remove('hidden');
+        if (pwEl) { pwEl.value = ''; pwEl.focus(); }
+      }
+    } catch (err) {
+      errEl.textContent = err.message || 'An unexpected error occurred';
+      errEl.classList.remove('hidden');
+    }
   }
 
   // === Request a Secret ===

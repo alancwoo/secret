@@ -82,17 +82,19 @@
   <p class="msg-success mb-lg">Your secret has been encrypted and saved. Please send the following link and key back to the person who requested it, using your preferred channel.</p>
 
   <p class="section-label">Full Link (URL + Key)</p>
-  <div id="result-full-url" class="result-box" onclick="copyText(this.textContent)"></div>
+  <div id="result-full-url" class="result-box" onclick="copyText(this)"></div>
   <p class="copy-hint">Click to copy</p>
 
   <div class="mt-lg">
     <p class="msg-success">For increased security, send the URL and KEY separately through different channels.</p>
 
     <p class="section-label">URL</p>
-    <div id="result-url" class="result-box" onclick="copyText(this.textContent)"></div>
+    <div id="result-url" class="result-box" onclick="copyText(this)"></div>
+    <p class="copy-hint">Click to copy</p>
 
     <p class="section-label">Key</p>
-    <div id="result-key" class="result-box" onclick="copyText(this.textContent)"></div>
+    <div id="result-key" class="result-box" onclick="copyText(this)"></div>
+    <p class="copy-hint">Click to copy</p>
   </div>
 
   <p class="form-hint mt-lg">This request link is now used and cannot be accessed again.</p>
@@ -186,8 +188,30 @@
     return false;
   };
 
-  window.copyText = function (text) {
-    if (navigator.clipboard) navigator.clipboard.writeText(text.trim());
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+
+  window.copyText = function (el) {
+    var text = el.textContent.trim();
+    var hint = el.nextElementSibling;
+    function feedback() {
+      if (hint && hint.classList.contains('copy-hint')) {
+        hint.textContent = 'Copied!';
+        setTimeout(function () { hint.textContent = 'Click to copy'; }, 2000);
+      }
+    }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(feedback).catch(function () { fallbackCopy(text); feedback(); });
+    } else {
+      fallbackCopy(text); feedback();
+    }
   };
 
   function showError(msg) {
